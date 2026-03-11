@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Inventory Parser AI
 
 An AI-powered inventory parsing tool with a chat-based UI. Upload any Excel or CSV file and the agent will automatically detect the structure, map columns to standard product fields, preview the normalised data, and save to a database.
@@ -132,3 +133,7 @@ OLLAMA_MODEL = "llama3.2"   # change to e.g. "mistral", "llama3.1", "gemma2"
 ```
 
 Then pull the model: `ollama pull mistral`
+=======
+# invento
+Inventory Data Parser 
+>>>>>>> origin/main
