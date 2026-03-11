@@ -1,0 +1,11 @@
+Item Code,Product Name,Colour,Size,Stock Qty,RRP (£),Trade Price,EAN Barcode,Batch No,Units Per Box,Weight (kg),Image URL,Product URL,Supplier Ref,Country of Origin
+SKU-001,Men's Running Jacket,Blue,M,120,89.99,44.99,5012345678901,BATCH-2024-A,6,0.45,https://cdn.example.com/img/sku001.jpg,https://shop.example.com/products/sku001,SUPP-4412,China
+SKU-002,Men's Running Jacket,Blue,L,85,89.99,44.99,5012345678902,BATCH-2024-A,6,0.47,https://cdn.example.com/img/sku002.jpg,https://shop.example.com/products/sku002,SUPP-4412,China
+SKU-003,Men's Running Jacket,Red,M,60,89.99,44.99,5012345678903,BATCH-2024-B,6,0.45,https://cdn.example.com/img/sku003.jpg,https://shop.example.com/products/sku003,SUPP-4412,China
+SKU-004,Women's Leggings,Black,S,200,59.99,29.99,5012345678904,BATCH-2024-A,12,0.30,https://cdn.example.com/img/sku004.jpg,https://shop.example.com/products/sku004,SUPP-7730,Vietnam
+SKU-005,Women's Leggings,Black,M,175,59.99,29.99,5012345678905,BATCH-2024-A,12,0.31,https://cdn.example.com/img/sku005.jpg,https://shop.example.com/products/sku005,SUPP-7730,Vietnam
+SKU-006,Women's Leggings,Black,L,140,59.99,29.99,5012345678906,BATCH-2024-A,12,0.32,https://cdn.example.com/img/sku006.jpg,https://shop.example.com/products/sku006,SUPP-7730,Vietnam
+SKU-007,Trail Running Shoes,Grey,UK8,50,129.99,64.99,5012345678907,BATCH-2024-C,6,0.80,https://cdn.example.com/img/sku007.jpg,https://shop.example.com/products/sku007,SUPP-1190,Cambodia
+SKU-008,Trail Running Shoes,Grey,UK9,45,129.99,64.99,5012345678908,BATCH-2024-C,6,0.82,https://cdn.example.com/img/sku008.jpg,https://shop.example.com/products/sku008,SUPP-1190,Cambodia
+SKU-009,Compression Socks,White,One Size,300,14.99,7.49,5012345678909,BATCH-2024-B,24,0.08,https://cdn.example.com/img/sku009.jpg,https://shop.example.com/products/sku009,SUPP-3321,Bangladesh
+SKU-010,Running Cap,Black,One Size,220,24.99,12.49,5012345678910,BATCH-2024-B,12,0.12,https://cdn.example.com/img/sku010.jpg,https://shop.example.com/products/sku010,SUPP-3321,Bangladesh

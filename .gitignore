@@ -1,0 +1,14 @@
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+frontend/node_modules/
+frontend/dist/
+
+backend/uploads/
+backend/outputs/
+backend/inventory.db
+backend/*.log
+
+*.log
