@@ -1,237 +1,263 @@
 import { useState } from "react";
-import { CheckCircle2, ChevronDown, Edit3, Sparkles, X, Plus } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, Edit3, Package, Truck } from "lucide-react";
 import { Mapping } from "../api/client";
+import CustomSelect from "./CustomSelect";
 
-const STANDARD_FIELD_LABELS: Record<string, string> = {
-  sku: "SKU / Item Code",
-  description: "Product Description",
-  size: "Size / Variant",
-  quantity: "Quantity",
-  retail_price: "Retail Price (RRP)",
-  offer_price: "Offer / Trade Price",
-  barcode: "Barcode (EAN/UPC)",
-  links: "Product Links / URL",
-  photos: "Photos / Image URL",
-  batch_id: "Batch ID / Lot Number",
-  units_per_carton: "Units per Carton",
-  shipping_details: "Shipping Details",
+// ─── Field definitions matching the output template ───────────────────────────
+
+const PRIMARY_FIELDS: Record<string, string> = {
+  sku: "SKU",
+  product_name: "Product Name",
+  quantity_in_units: "Quantity in units",
+  barcode: "Barcode",
+  barcode_key: "Barcode Key (EAN/UPC)",
+  unit_size: "Unit Size",
+  color: "Color",
+  gender: "Gender",
+  brand: "Brand",
+  category: "Category",
+  sub_category: "Sub Category",
+  local_currency: "Local Currency",
+  retail_price_local: "Retail Price (Local)",
+  asking_price_local: "Asking Price (Local)",
+  discount: "Discount",
+  image_url: "Image URL",
+  amazon_links: "Amazon Links",
 };
 
-function toLabel(field: string): string {
-  return field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-}
+const SECONDARY_FIELDS: Record<string, string> = {
+  batch_code: "Batch Code",
+  units_per_carton: "Units Per Carton",
+  total_carton: "Total Carton",
+  warehouse_location: "Warehouse Location",
+  expiry_date: "Expiry Date (YYYY-MM-DD)",
+  manufacturing_date: "Manufacturing Date",
+  weight_per_unit: "Weight per unit",
+  net_weight_of_carton: "Net weight of carton",
+  cbm_per_carton: "CBM per carton",
+  remarks: "Remarks",
+  other_notes: "Other Notes",
+};
+
+export type ConfirmMappingFn = (mapping: Mapping) => void;
 
 interface Props {
   mapping: Mapping;
-  discoveredFields: string[];
+  mappingConfidence?: Record<string, number>;
+  lowConfidenceFields?: string[];
   availableColumns: string[];
-  onConfirm: (mapping: Mapping, discoveredFields: string[]) => void;
+  onConfirm: ConfirmMappingFn;
 }
 
 interface FieldRowProps {
   field: string;
   label: string;
   value: string;
+  confidence?: number;
+  isLowConfidence: boolean;
   availableColumns: string[];
   confirmed: boolean;
   onChange: (field: string, value: string) => void;
-  onRemove?: (field: string) => void;
 }
 
-function FieldRow({ field, label, value, availableColumns, confirmed, onChange, onRemove }: FieldRowProps) {
+const CURRENCY_OPTIONS = [
+  "USD", "EUR", "AED", "SGD", "INR", "GBP", "CNY", "JPY",
+  "IDR", "MYR", "THB", "PHP", "AUD", "NZD",
+  "HKD", "CAD", "CHF",
+];
+
+const CURRENCY_TOKEN_PREFIX = "__const_currency__:";
+const CURRENCY_LABELS: Record<string, string> = {
+  GBP: "Pound (GBP)",
+};
+
+function confidenceTextClass(conf?: number, isLow = false): string {
+  if (isLow) return "text-orange-500";
+  if (typeof conf !== "number") return "text-gray-400";
+  if (conf >= 0.85) return "text-green-600";
+  if (conf >= 0.7) return "text-yellow-600";
+  return "text-orange-500";
+}
+
+function FieldRow({
+  field,
+  label,
+  value,
+  confidence,
+  isLowConfidence,
+  availableColumns,
+  confirmed,
+  onChange,
+}: FieldRowProps) {
   const isMatched = Boolean(value);
+  const isCurrencyField = field === "local_currency";
+  const isConstCurrency = isCurrencyField && value.startsWith(CURRENCY_TOKEN_PREFIX);
+  const detectedCurrencyColumn = isCurrencyField && value && !isConstCurrency ? value : "";
+  const options = isCurrencyField
+    ? [
+        ...(detectedCurrencyColumn ? [detectedCurrencyColumn] : []),
+        ...CURRENCY_OPTIONS.map((code) => `${CURRENCY_TOKEN_PREFIX}${code}`),
+      ]
+    : availableColumns;
+  const optionLabel = (optionValue: string) => {
+    if (isCurrencyField && optionValue.startsWith(CURRENCY_TOKEN_PREFIX)) {
+      const code = optionValue.slice(CURRENCY_TOKEN_PREFIX.length);
+      return `Currency: ${CURRENCY_LABELS[code] ?? code}`;
+    }
+    if (isCurrencyField) {
+      return `Detected from sheet: ${optionValue}`;
+    }
+    return optionValue;
+  };
   return (
     <div className="flex items-center gap-2">
       <div className="flex-1 min-w-0">
-        <p className={`text-xs font-medium truncate ${isMatched ? "text-slate-300" : "text-slate-500"}`}>
+        <p className={`text-xs font-medium truncate ${isMatched ? "text-ui-text" : "text-gray-500"}`}>
           {label}
         </p>
+        {isMatched && (
+          <p className={`text-[11px] ${confidenceTextClass(confidence, isLowConfidence)}`}>
+            {typeof confidence === "number"
+              ? `Confidence: ${Math.round(confidence * 100)}%${isLowConfidence ? " (please review)" : ""}`
+              : "Confidence: estimated"}
+          </p>
+        )}
       </div>
-      <div className="relative flex-1 min-w-0">
-        <select
-          disabled={confirmed}
+      <div className="flex-1 min-w-0">
+        <CustomSelect
           value={value}
-          onChange={(e) => onChange(field, e.target.value)}
-          className={[
-            "w-full text-xs rounded-lg px-2 py-1.5 pr-6 appearance-none border outline-none",
-            "bg-slate-900 text-slate-200 border-slate-600",
-            confirmed ? "opacity-60 cursor-not-allowed" : "hover:border-slate-400 focus:border-brand-500",
-            !isMatched ? "text-slate-500" : "",
-          ].join(" ")}
-        >
-          <option value="">— not mapped —</option>
-          {availableColumns.map((col) => (
-            <option key={col} value={col}>{col}</option>
-          ))}
-        </select>
-        <ChevronDown className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400" />
+          options={options.map((o) => ({ value: o, label: optionLabel(o) }))}
+          placeholder="— skip —"
+          disabled={confirmed}
+          isUnmatched={!isMatched}
+          onChange={(v) => onChange(field, v)}
+        />
       </div>
       {isMatched
-        ? <CheckCircle2 className="w-4 h-4 text-green-400 flex-shrink-0" />
-        : <div className="w-4 h-4 flex-shrink-0" />
+        ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+        : <div className="w-3.5 h-3.5 rounded-full border border-ui-border flex-shrink-0" />
       }
-      {onRemove && !confirmed && (
-        <button
-          onClick={() => onRemove(field)}
-          className="flex-shrink-0 w-4 h-4 text-slate-500 hover:text-red-400 transition-colors"
-          title="Remove discovered field"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      )}
-      {(!onRemove || confirmed) && <div className="w-4 h-4 flex-shrink-0" />}
     </div>
   );
 }
 
 export default function MappingCard({
-  mapping: initialMapping,
-  discoveredFields: initialDiscovered,
+  mapping: initial,
+  mappingConfidence = {},
+  lowConfidenceFields = [],
   availableColumns,
   onConfirm,
 }: Props) {
-  const [mapping, setMapping] = useState<Mapping>({ ...initialMapping });
-  const [discoveredFields, setDiscoveredFields] = useState<string[]>([...initialDiscovered]);
+  const [mapping, setMapping] = useState<Mapping>({ ...initial });
   const [confirmed, setConfirmed] = useState(false);
-  const [newFieldName, setNewFieldName] = useState("");
-  const [showAddField, setShowAddField] = useState(false);
+  const [showSecondary, setShowSecondary] = useState(false);
 
   const handleChange = (field: string, value: string) => {
-    setMapping((prev) => ({ ...prev, [field]: value === "" ? null : value }));
-  };
-
-  const handleRemoveDiscovered = (field: string) => {
-    setDiscoveredFields((prev) => prev.filter((f) => f !== field));
     setMapping((prev) => {
       const next = { ...prev };
-      delete next[field];
+      if (value === "") { delete next[field]; } else { next[field] = value; }
       return next;
     });
   };
 
-  const handleAddField = () => {
-    const safe = newFieldName.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "");
-    if (!safe || discoveredFields.includes(safe) || STANDARD_FIELD_LABELS[safe]) return;
-    setDiscoveredFields((prev) => [...prev, safe]);
-    setMapping((prev) => ({ ...prev, [safe]: null }));
-    setNewFieldName("");
-    setShowAddField(false);
-  };
-
   const handleConfirm = () => {
-    const activeMapping = Object.fromEntries(
-      Object.entries(mapping).filter(([k]) =>
-        STANDARD_FIELD_LABELS[k] !== undefined || discoveredFields.includes(k)
-      )
-    );
     setConfirmed(true);
-    onConfirm(activeMapping, discoveredFields);
+    onConfirm(mapping);
   };
-
-  const standardMapped = Object.keys(STANDARD_FIELD_LABELS).filter((f) => mapping[f]);
-  const discMapped = discoveredFields.filter((f) => mapping[f]);
-  const totalMapped = standardMapped.length + discMapped.length;
+  const primaryCount = Object.keys(PRIMARY_FIELDS).filter((f) => mapping[f]).length;
+  const secondaryCount = Object.keys(SECONDARY_FIELDS).filter((f) => mapping[f]).length;
 
   return (
-    <div className="bg-slate-800 border border-slate-700 rounded-xl overflow-hidden w-full max-w-lg">
+    <div className="bg-ui-card border border-ui-border rounded-xl overflow-hidden w-full">
       {/* Header */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-slate-700 bg-slate-900/40">
-        <Edit3 className="w-4 h-4 text-brand-400" />
-        <span className="text-sm font-semibold text-slate-200">Column Mapping</span>
-        <span className="ml-auto text-xs text-slate-400">
-          {totalMapped} field{totalMapped !== 1 ? "s" : ""} matched
+      <div className="flex items-center gap-2 px-4 py-3 border-b border-ui-border bg-gray-50/50">
+        <Edit3 className="w-4 h-4 text-ui-text" />
+        <span className="text-sm font-medium text-ui-text">Fields</span>
+        <span className="ml-auto text-xs text-ui-accent">
+          {primaryCount + secondaryCount} matched
         </span>
       </div>
 
       <div className="p-4 space-y-4">
-        {/* ── Standard fields section ─────────────────────────────────────── */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
-            Standard Fields
-          </p>
-          {Object.entries(STANDARD_FIELD_LABELS).map(([field, label]) => (
-            <FieldRow
-              key={field}
-              field={field}
-              label={label}
-              value={mapping[field] ?? ""}
-              availableColumns={availableColumns}
-              confirmed={confirmed}
-              onChange={handleChange}
-            />
-          ))}
-        </div>
-
-        {/* ── Discovered fields section ────────────────────────────────────── */}
-        {(discoveredFields.length > 0 || !confirmed) && (
-          <div className="space-y-2 pt-2 border-t border-slate-700/60">
-            <div className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
-                Discovered Fields
-              </p>
-              <span className="ml-1 text-xs text-slate-500">
-                (auto-detected by the agent)
-              </span>
+        {lowConfidenceFields.length > 0 && (
+          <div className="rounded-lg border border-orange-200 bg-orange-50 p-2.5">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-orange-700">
+                  Low-confidence mapping detected
+                </p>
+                <p className="text-xs text-orange-600">
+                  Please review: {lowConfidenceFields.join(", ")}
+                </p>
+              </div>
             </div>
+          </div>
+        )}
 
-            {discoveredFields.length === 0 && !confirmed && (
-              <p className="text-xs text-slate-500 italic pl-1">
-                No extra fields were discovered for this file.
-              </p>
-            )}
+        {/* ── PRIMARY FIELDS ─────────────────────────────────────────────── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-1.5">
+            <Package className="w-3.5 h-3.5 text-ui-text" />
+            <p className="text-[11px] font-semibold text-ui-text uppercase tracking-wider">
+              Primary
+            </p>
+            <span className="ml-1 text-xs text-ui-accent">
+              ({primaryCount}/{Object.keys(PRIMARY_FIELDS).length})
+            </span>
+          </div>
 
-            {discoveredFields.map((field) => (
+          {Object.entries(PRIMARY_FIELDS).map(([field, label]) => {
+            return (
               <FieldRow
                 key={field}
                 field={field}
-                label={toLabel(field)}
+                label={label}
                 value={mapping[field] ?? ""}
+                confidence={mappingConfidence[field]}
+                isLowConfidence={lowConfidenceFields.includes(field)}
                 availableColumns={availableColumns}
                 confirmed={confirmed}
                 onChange={handleChange}
-                onRemove={handleRemoveDiscovered}
               />
-            ))}
+            );
+          })}
+        </div>
 
-            {/* Add custom field */}
-            {!confirmed && (
-              showAddField ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="text"
-                    value={newFieldName}
-                    onChange={(e) => setNewFieldName(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleAddField()}
-                    placeholder="field_name (snake_case)"
-                    className="flex-1 text-xs bg-slate-900 border border-slate-600 rounded-lg px-2 py-1.5 text-slate-200 placeholder-slate-500 outline-none focus:border-brand-500"
-                    autoFocus
-                  />
-                  <button
-                    onClick={handleAddField}
-                    className="text-xs px-2 py-1.5 rounded-lg bg-amber-600/30 hover:bg-amber-600/50 text-amber-300 border border-amber-700/50 transition-colors"
-                  >
-                    Add
-                  </button>
-                  <button
-                    onClick={() => { setShowAddField(false); setNewFieldName(""); }}
-                    className="text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowAddField(true)}
-                  className="flex items-center gap-1 text-xs text-slate-500 hover:text-amber-400 transition-colors mt-1"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add custom field
-                </button>
-              )
-            )}
-          </div>
-        )}
+        {/* ── SECONDARY FIELDS (collapsible) ─────────────────────────────── */}
+        <div className="border-t border-ui-border pt-2">
+          <button
+            onClick={() => setShowSecondary(!showSecondary)}
+            className="flex items-center gap-1.5 w-full text-left"
+          >
+            <Truck className="w-3.5 h-3.5 text-ui-accent" />
+            <p className="text-[11px] font-semibold text-ui-accent uppercase tracking-wider">
+              Secondary
+            </p>
+            <span className="ml-1 text-xs text-ui-accent">
+              ({secondaryCount}/{Object.keys(SECONDARY_FIELDS).length})
+            </span>
+            <ChevronDown className={`w-3 h-3 text-ui-accent ml-auto transition-transform ${showSecondary ? "rotate-180" : ""}`} />
+          </button>
+
+          {showSecondary && (
+            <div className="space-y-2 mt-2">
+              {Object.entries(SECONDARY_FIELDS).map(([field, label]) => (
+                <FieldRow
+                  key={field}
+                  field={field}
+                  label={label}
+                  value={mapping[field] ?? ""}
+                  confidence={mappingConfidence[field]}
+                  isLowConfidence={lowConfidenceFields.includes(field)}
+                  availableColumns={availableColumns}
+                  confirmed={confirmed}
+                  onChange={handleChange}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Footer */}
@@ -239,18 +265,18 @@ export default function MappingCard({
         <div className="px-4 pb-4 space-y-2">
           <button
             onClick={handleConfirm}
-            className="w-full py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition-colors"
+            className="w-full py-2 rounded-lg bg-ui-text hover:bg-gray-800 text-white text-sm font-medium transition-colors"
           >
             Confirm Mapping
           </button>
-          <p className="text-center text-xs text-slate-500">
-            Remove discovered fields you don't need · Add custom ones · Or type corrections below
+          <p className="text-center text-[11px] text-ui-accent">
+            Missing fields are skipped. Category/Sub Category are auto-assigned per product row if not mapped.
           </p>
         </div>
       ) : (
-        <div className="px-4 pb-4 flex items-center justify-center gap-2 text-green-400 text-sm">
+        <div className="px-4 pb-4 flex items-center justify-center gap-2 text-green-600 text-sm font-medium">
           <CheckCircle2 className="w-4 h-4" />
-          Mapping confirmed — {totalMapped} fields
+          Confirmed — {primaryCount + secondaryCount} fields
         </div>
       )}
     </div>

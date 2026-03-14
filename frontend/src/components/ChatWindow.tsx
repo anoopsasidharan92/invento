@@ -1,16 +1,14 @@
 import { useEffect, useRef } from "react";
-import { Bot, User, AlertCircle, Loader2 } from "lucide-react";
-import MappingCard from "./MappingCard";
-import DataPreview from "./DataPreview";
+import { Bot, AlertCircle, ArrowRight } from "lucide-react";
 import {
-  Mapping,
   MappingContent,
   PreviewContent,
   DoneContent,
 } from "../api/client";
 
 export type MessageRole = "agent" | "user" | "error";
-export type ConfirmMappingFn = (mapping: Mapping, discoveredFields: string[]) => void;
+export { type ConfirmMappingFn } from "./MappingCard";
+export type CellEditFn = (rowIndex: number, field: string, value: string) => void;
 
 export interface ChatMessage {
   id: string;
@@ -24,17 +22,17 @@ export interface ChatMessage {
 interface Props {
   messages: ChatMessage[];
   thinking: boolean;
-  onConfirmMapping: ConfirmMappingFn;
+  onConfirmMapping?: any; // kept for compatibility if needed, but App.tsx handles it now
+  onCellEdit?: any;
 }
 
 function renderMarkdown(text: string) {
-  // Basic bold (**text**) and line breaks
   return text
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
     .replace(/\n/g, "<br />");
 }
 
-export default function ChatWindow({ messages, thinking, onConfirmMapping }: Props) {
+export default function ChatWindow({ messages, thinking }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -42,70 +40,79 @@ export default function ChatWindow({ messages, thinking, onConfirmMapping }: Pro
   }, [messages, thinking]);
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin">
+    <div className="flex-1 flex flex-col space-y-6 pb-4">
       {messages.map((msg) => {
         const isAgent = msg.role === "agent";
         const isError = msg.role === "error";
 
+        const hasText = !!msg.text;
+        const hasMapping = !!msg.mappingContent;
+        const hasPreview = !!msg.previewContent;
+
+        if (!hasText && !hasMapping && !hasPreview) return null;
+
         return (
           <div
             key={msg.id}
-            className={`flex gap-3 ${isAgent || isError ? "justify-start" : "justify-end"}`}
+            className={`msg-enter flex gap-4 ${isAgent || isError ? "justify-start" : "justify-end"}`}
           >
             {(isAgent || isError) && (
-              <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-                isError ? "bg-red-900/60" : "bg-brand-700/60"
-              }`}>
+              <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center bg-white border border-ui-border shadow-sm mt-0.5">
                 {isError
                   ? <AlertCircle className="w-4 h-4 text-red-400" />
-                  : <Bot className="w-4 h-4 text-brand-300" />
+                  : <Bot className="w-4 h-4 text-ui-text" />
                 }
               </div>
             )}
 
-            <div className={`flex flex-col gap-2 max-w-[85%] ${!isAgent && !isError ? "items-end" : "items-start"}`}>
-              {msg.text && (
+            <div className={`flex flex-col gap-1.5 max-w-[85%] ${!isAgent && !isError ? "items-end" : "items-start"}`}>
+              <span className="text-[11px] text-ui-accent px-1">
+                {isAgent || isError ? "AI" : "You"}
+              </span>
+
+              {hasText && (
                 <div className={[
-                  "rounded-2xl px-4 py-2.5 text-sm leading-relaxed",
-                  isAgent ? "bg-slate-800 text-slate-200 rounded-tl-sm" : "",
-                  !isAgent && !isError ? "bg-brand-600 text-white rounded-tr-sm" : "",
-                  isError ? "bg-red-900/40 text-red-300 border border-red-800/60 rounded-tl-sm" : "",
+                  "text-[15px] leading-relaxed",
+                  isAgent ? "text-ui-text" : "",
+                  !isAgent && !isError
+                    ? "bg-ui-text text-white px-4 py-2.5 rounded-2xl rounded-tr-sm shadow-sm"
+                    : "",
+                  isError ? "text-red-500" : "",
                 ].join(" ")}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text) }}
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.text!) }}
                 />
               )}
 
-              {msg.mappingContent && (
-                <MappingCard
-                  mapping={msg.mappingContent.mapping}
-                  discoveredFields={msg.mappingContent.discovered_fields ?? []}
-                  availableColumns={msg.mappingContent.available_columns}
-                  onConfirm={onConfirmMapping}
-                />
+              {hasMapping && !hasText && (
+                <div className="text-[14px] text-ui-text flex items-center gap-2 bg-white px-4 py-3 rounded-xl border border-ui-border shadow-sm">
+                  Columns analyzed. Review the mapping in the panel.
+                  <ArrowRight className="w-3.5 h-3.5 text-ui-accent flex-shrink-0" />
+                </div>
               )}
 
-              {msg.previewContent && (
-                <DataPreview preview={msg.previewContent} />
+              {hasPreview && !hasText && (
+                <div className="text-[14px] text-ui-text flex items-center gap-2 bg-white px-4 py-3 rounded-xl border border-ui-border shadow-sm">
+                  Data preview ready. Review it in the panel.
+                  <ArrowRight className="w-3.5 h-3.5 text-ui-accent flex-shrink-0" />
+                </div>
               )}
             </div>
-
-            {!isAgent && !isError && (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center">
-                <User className="w-4 h-4 text-slate-300" />
-              </div>
-            )}
           </div>
         );
       })}
 
       {thinking && (
-        <div className="flex gap-3 justify-start">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-brand-700/60 flex items-center justify-center">
-            <Bot className="w-4 h-4 text-brand-300" />
+        <div className="msg-enter flex gap-4 justify-start">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-white border border-ui-border shadow-sm flex items-center justify-center mt-0.5">
+            <Bot className="w-4 h-4 text-ui-text" />
           </div>
-          <div className="bg-slate-800 rounded-2xl rounded-tl-sm px-4 py-2.5 flex items-center gap-2">
-            <Loader2 className="w-4 h-4 text-brand-400 animate-spin" />
-            <span className="text-sm text-slate-400">Thinking…</span>
+          <div className="flex flex-col gap-1.5 items-start">
+            <span className="text-[11px] text-ui-accent px-1">AI</span>
+            <div className="bg-white border border-ui-border shadow-sm px-4 py-3 rounded-2xl rounded-tl-sm flex items-center gap-1.5">
+              <div className="typing-dot" />
+              <div className="typing-dot" />
+              <div className="typing-dot" />
+            </div>
           </div>
         </div>
       )}

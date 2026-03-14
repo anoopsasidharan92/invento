@@ -47,16 +47,16 @@ export default function FileUpload({ onUploaded, disabled }: Props) {
   };
 
   return (
-    <div className="px-4 pb-4">
+    <div className="px-4 pt-4">
       <div
         onClick={() => !disabled && !loading && inputRef.current?.click()}
         onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
         onDragLeave={() => setDragging(false)}
         onDrop={onDrop}
         className={[
-          "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all",
-          dragging ? "border-brand-500 bg-brand-500/10" : "border-slate-600 hover:border-slate-400",
-          disabled || loading ? "opacity-50 cursor-not-allowed" : "",
+          "border border-dashed rounded-xl p-6 text-center cursor-pointer transition-all",
+          dragging ? "border-ui-text bg-gray-50" : "border-ui-border hover:border-gray-400",
+          disabled || loading ? "opacity-50 cursor-not-allowed" : "bg-white",
         ].join(" ")}
       >
         <input
@@ -68,25 +68,24 @@ export default function FileUpload({ onUploaded, disabled }: Props) {
           disabled={disabled || loading}
         />
         {loading ? (
-          <div className="flex items-center justify-center gap-2 text-brand-400">
-            <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">Uploading & parsing…</span>
+          <div className="flex flex-col items-center justify-center gap-2 text-ui-text">
+            <Loader2 className="w-5 h-5 animate-spin text-ui-accent" />
+            <span className="text-[13px] font-medium">Uploading & parsing…</span>
           </div>
         ) : (
           <div className="flex flex-col items-center gap-2">
-            <div className="flex items-center gap-2 text-slate-300">
-              <Upload className="w-5 h-5 text-brand-400" />
-              <FileSpreadsheet className="w-5 h-5 text-green-400" />
+            <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-50 border border-ui-border mb-1">
+              <Upload className="w-4 h-4 text-ui-text" />
             </div>
-            <p className="text-sm text-slate-300">
-              <span className="text-brand-400 font-medium">Click to upload</span> or drag &amp; drop
+            <p className="text-[13px] text-ui-text">
+              <span className="font-semibold">Click to upload</span> or drag &amp; drop
             </p>
-            <p className="text-xs text-slate-500">CSV, XLSX, XLS, XLSM supported</p>
+            <p className="text-[11px] text-ui-accent">CSV, XLSX, XLS, XLSM supported</p>
           </div>
         )}
       </div>
       {error && (
-        <p className="mt-2 text-xs text-red-400 text-center">{error}</p>
+        <p className="mt-2 text-[11px] text-red-500 text-center">{error}</p>
       )}
     </div>
   );

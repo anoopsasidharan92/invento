@@ -19,36 +19,45 @@ export interface UploadResponse {
   sheets: Record<string, SheetInfo>;
 }
 
-export type Mapping = Record<string, string | null>;
+export type Mapping = Record<string, string>;
 
 export interface WSIncomingMessage {
-  type:
-    | "agent"
-    | "mapping"
-    | "preview"
-    | "done"
-    | "error";
+  type: "agent" | "mapping" | "preview" | "done" | "error" | "progress";
   content: unknown;
 }
 
 export interface MappingContent {
   mapping: Mapping;
-  discovered_fields: string[];
+  mapping_confidence?: Record<string, number>;
+  low_confidence_fields?: string[];
   available_columns: string[];
+  sample_rows?: Record<string, string>[];
   sheet_name: string;
 }
+
+export type Taxonomy = Record<string, string[]>;
 
 export interface PreviewContent {
   columns: string[];
   rows: Record<string, string>[];
   total_rows: number;
   file_id: string;
+  taxonomy?: Taxonomy;
 }
 
 export interface DoneContent {
   file_id: string;
   row_count: number;
   mapped_fields: number;
+  enrichment_needed?: boolean;
+}
+
+export interface ProgressContent {
+  active: boolean;
+  label: string;
+  current?: number;
+  total?: number;
+  percent?: number | null;
 }
 
 // ─── REST helpers ─────────────────────────────────────────────────────────────
@@ -66,6 +75,10 @@ export async function uploadFile(file: File): Promise<UploadResponse> {
 
 export function getDownloadUrl(fileId: string): string {
   return `${API_BASE}/download/${fileId}`;
+}
+
+export function getCleanTemplateDownloadUrl(fileId: string): string {
+  return `${API_BASE}/download/${fileId}/clean-template`;
 }
 
 // ─── WebSocket chat client ────────────────────────────────────────────────────
@@ -90,9 +103,8 @@ export class ChatClient {
     if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
       return Promise.resolve();
     }
-    if (this.connectPromise) {
-      return this.connectPromise;
-    }
+    if (this.connectPromise) return this.connectPromise;
+
     this.manualClose = false;
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
@@ -100,38 +112,22 @@ export class ChatClient {
     }
 
     this.connectPromise = new Promise((resolve, reject) => {
-      if (this.ws && this.ws.readyState !== WebSocket.CLOSED) {
-        this.ws.close();
-      }
+      if (this.ws && this.ws.readyState !== WebSocket.CLOSED) this.ws.close();
       this.ws = new WebSocket(`${WS_BASE}/ws/chat`);
 
-      this.ws.onopen = () => {
-        this.connectPromise = null;
-        resolve();
-      };
-      this.ws.onerror = (e) => {
-        this.onError(e);
-        this.connectPromise = null;
-        reject(e);
-      };
+      this.ws.onopen = () => { this.connectPromise = null; resolve(); };
+      this.ws.onerror = (e) => { this.onError(e); this.connectPromise = null; reject(e); };
       this.ws.onmessage = (e) => {
-        try {
-          const msg: WSIncomingMessage = JSON.parse(e.data as string);
-          this.onMessage(msg);
-        } catch {
-          // ignore malformed frames
-        }
+        try { this.onMessage(JSON.parse(e.data as string)); } catch { /* skip */ }
       };
       this.ws.onclose = () => {
         this.connectPromise = null;
         this.ws = null;
-        if (!this.manualClose) {
-          if (!this.reconnectTimer) {
-            this.reconnectTimer = setTimeout(() => {
-              this.reconnectTimer = null;
-              this.connect().catch(() => {});
-            }, 2000);
-          }
+        if (!this.manualClose && !this.reconnectTimer) {
+          this.reconnectTimer = setTimeout(() => {
+            this.reconnectTimer = null;
+            this.connect().catch(() => {});
+          }, 2000);
         }
       };
     });
@@ -139,14 +135,11 @@ export class ChatClient {
   }
 
   send(type: string, content: unknown): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (this.ws?.readyState === WebSocket.OPEN)
       this.ws.send(JSON.stringify({ type, content }));
-    }
   }
 
-  sendUserMessage(text: string): void {
-    this.send("user", { text });
-  }
+  sendUserMessage(text: string): void { this.send("user", { text }); }
 
   sendFileUploaded(uploadResponse: UploadResponse, selectedSheet: string): void {
     this.send("file_uploaded", {
@@ -158,22 +151,21 @@ export class ChatClient {
     });
   }
 
-  confirmMapping(mapping: Mapping, discoveredFields: string[]): void {
-    this.send("confirm_mapping", { mapping, discovered_fields: discoveredFields });
+  confirmMapping(mapping: Mapping): void {
+    this.send("confirm_mapping", { mapping });
+  }
+
+  updateCell(rowIndex: number, field: string, value: string): void {
+    this.send("update_cell", { row_index: rowIndex, field, value });
   }
 
   disconnect(): void {
     this.manualClose = true;
-    if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
-      this.reconnectTimer = null;
-    }
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
     this.ws?.close();
     this.ws = null;
     this.connectPromise = null;
   }
 
-  get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
+  get isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN; }
 }
