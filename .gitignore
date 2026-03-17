@@ -1,4 +1,5 @@
 venv/
+.venv/
 __pycache__/
 *.pyc
 .DS_Store
@@ -10,5 +11,7 @@ backend/uploads/
 backend/outputs/
 backend/inventory.db
 backend/*.log
+backend/.venv/
+backend/context_memory.json
 
 *.log
