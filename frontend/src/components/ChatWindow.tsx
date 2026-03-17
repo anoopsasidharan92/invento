@@ -8,7 +8,7 @@ import {
 
 export type MessageRole = "agent" | "user" | "error";
 export { type ConfirmMappingFn } from "./MappingCard";
-export type CellEditFn = (rowIndex: number, field: string, value: string) => void;
+export type CellEditFn = (rowIndex: number, field: string, value: string, applyAll?: boolean) => void;
 
 export interface ChatMessage {
   id: string;

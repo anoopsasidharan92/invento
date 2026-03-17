@@ -13,7 +13,7 @@ const EDITABLE_COLUMNS = new Set(["Category", "Sub Category"]);
 
 interface Props {
   preview: PreviewContent;
-  onCellEdit?: (rowIndex: number, field: string, value: string) => void;
+  onCellEdit?: (rowIndex: number, field: string, value: string, applyAll?: boolean) => void;
 }
 
 interface EditingCell {
@@ -25,11 +25,17 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [localRows, setLocalRows] = useState<Record<string, string>[]>(preview.rows);
+  // Draft value for units_per_carton inline inputs (keyed by absolute row index)
+  const [upcDrafts, setUpcDrafts] = useState<Record<number, string>>({});
 
   const taxonomy: Taxonomy = preview.taxonomy ?? {};
   const categories = Object.keys(taxonomy);
   const totalPages = Math.ceil(localRows.length / PAGE_SIZE);
   const visibleRows = localRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // Whether total_carton is the mapped qty source and units_per_carton is missing
+  const showUpcInput =
+    (preview.total_carton_mapped ?? false) && !(preview.units_per_carton_mapped ?? false);
 
   if (preview.rows !== localRows && preview.rows.length > 0) {
     setLocalRows(preview.rows);
@@ -58,12 +64,81 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
     [onCellEdit]
   );
 
+  /** Commit a units_per_carton value for a single row (or all rows if applyAll). */
+  const commitUpc = useCallback(
+    (absoluteIdx: number, value: string, applyAll: boolean) => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+
+      // Optimistic local update
+      setLocalRows((prev) => {
+        const next = applyAll
+          ? prev.map((r) => ({ ...r, "Units Per Carton": trimmed }))
+          : prev.map((r, i) => i === absoluteIdx ? { ...r, "Units Per Carton": trimmed } : r);
+        // Also update Quantity in units locally
+        return next.map((r, i) => {
+          if (!applyAll && i !== absoluteIdx) return r;
+          const tc = parseFloat(String(r["Total Carton"] ?? "").replace(",", ""));
+          const upc = parseFloat(trimmed.replace(",", ""));
+          if (!isNaN(tc) && !isNaN(upc)) {
+            const qty = tc * upc;
+            return { ...r, "Quantity in units": String(Number.isInteger(qty) ? qty : qty) };
+          }
+          return r;
+        });
+      });
+
+      if (onCellEdit) onCellEdit(absoluteIdx, "units_per_carton", trimmed, applyAll);
+    },
+    [onCellEdit]
+  );
+
   const renderCell = (row: Record<string, string>, pageRowIdx: number, col: string) => {
     const absoluteIdx = page * PAGE_SIZE + pageRowIdx;
     const value = String(row[col] ?? "");
     const isEditable = EDITABLE_COLUMNS.has(col) && !!onCellEdit && categories.length > 0;
     const isEditing =
       editing?.rowIdx === absoluteIdx && editing?.col === col;
+
+    // ── Units Per Carton editable input ─────────────────────────────────────
+    if (col === "Units Per Carton" && showUpcInput && !!onCellEdit) {
+      const draft = upcDrafts[absoluteIdx] ?? value;
+      return (
+        <div className="flex items-center gap-1 min-w-[110px]">
+          <input
+            type="number"
+            min="1"
+            placeholder="Enter qty"
+            value={draft}
+            onChange={(e) =>
+              setUpcDrafts((prev) => ({ ...prev, [absoluteIdx]: e.target.value }))
+            }
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v) commitUpc(absoluteIdx, v, false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                const v = (e.target as HTMLInputElement).value.trim();
+                if (v) commitUpc(absoluteIdx, v, false);
+                (e.target as HTMLInputElement).blur();
+              }
+            }}
+            className="w-20 text-xs border border-ui-border rounded px-1.5 py-0.5 outline-none focus:border-gray-400 bg-white text-ui-text"
+          />
+          <button
+            title="Apply to all rows"
+            onClick={() => {
+              const v = (upcDrafts[absoluteIdx] ?? value).trim();
+              if (v) commitUpc(absoluteIdx, v, true);
+            }}
+            className="text-[10px] text-gray-400 hover:text-black border border-ui-border rounded px-1 py-0.5 whitespace-nowrap transition-colors"
+          >
+            All
+          </button>
+        </div>
+      );
+    }
 
     if (isEditing && col === "Category") {
       return (
@@ -147,6 +222,11 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
             Click Category / Sub Category to edit
           </span>
         )}
+        {showUpcInput && (
+          <span className="text-[10px] text-amber-600 ml-1 border border-amber-200 bg-amber-50 rounded px-1.5 py-0.5">
+            Enter Units Per Carton to calculate total unit qty
+          </span>
+        )}
         <a
           href={getDownloadUrl(preview.file_id)}
           download
@@ -169,6 +249,9 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
                   {col}
                   {EDITABLE_COLUMNS.has(col) && categories.length > 0 && (
                     <Pencil className="w-2.5 h-2.5 inline ml-1 opacity-40" />
+                  )}
+                  {col === "Units Per Carton" && showUpcInput && (
+                    <Pencil className="w-2.5 h-2.5 inline ml-1 opacity-40 text-amber-500" />
                   )}
                 </th>
               ))}

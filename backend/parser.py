@@ -145,6 +145,68 @@ def _infer_header_row_index(raw_df: pd.DataFrame) -> int:
     return best_idx
 
 
+# ─── Supplementary section detection ────────────────────────────────────────────
+
+SECTION_KEYWORDS = [
+    "market reference", "reference rate", "reference price",
+    "colour legend", "color legend",
+    "pricing reference", "pricing benchmark", "price benchmark",
+    "pricing note", "pricing comparison",
+    "variance =", "purchase price minus",
+    "terms and conditions",
+    "end of inventory", "end of data",
+    "important note", "disclaimer",
+]
+
+
+def _detect_main_data_boundary(raw_df: pd.DataFrame, hdr_idx: int) -> int:
+    """
+    Detect where main inventory data ends and supplementary sections begin.
+    Looks for empty-row gaps followed by rows containing section keywords.
+    Returns len(raw_df) when no supplementary sections are detected,
+    preserving the original behaviour.
+    """
+    n = len(raw_df)
+    if hdr_idx + 1 >= n:
+        return n
+
+    hdr_cells = [_normalize_header_cell(v) for v in raw_df.iloc[hdr_idx].tolist()]
+    hdr_filled = sum(1 for c in hdr_cells if c)
+
+    i = hdr_idx + 1
+    while i < n:
+        row_vals = [str(v).strip() for v in raw_df.iloc[i].tolist()]
+        non_empty = [v for v in row_vals if v and v.lower() not in ("nan", "none")]
+
+        if not non_empty:
+            gap_start = i
+            while i < n:
+                rv = [str(v).strip() for v in raw_df.iloc[i].tolist()]
+                ne = [v for v in rv if v and v.lower() not in ("nan", "none")]
+                if ne:
+                    break
+                i += 1
+
+            if i >= n:
+                return gap_start
+
+            for j in range(i, min(i + 3, n)):
+                jv = [str(v).strip() for v in raw_df.iloc[j].tolist()]
+                jne = [v for v in jv if v and v.lower() not in ("nan", "none")]
+                jtext = " ".join(jne).lower()
+                if (
+                    any(kw in jtext for kw in SECTION_KEYWORDS)
+                    and len(jne) <= max(3, hdr_filled // 2)
+                ):
+                    return gap_start
+
+            continue
+
+        i += 1
+
+    return n
+
+
 def _apply_inferred_header(raw_df: pd.DataFrame) -> pd.DataFrame:
     if raw_df.empty:
         return _clean_dataframe(raw_df.copy())
@@ -152,7 +214,8 @@ def _apply_inferred_header(raw_df: pd.DataFrame) -> pd.DataFrame:
     header_cells = [_normalize_header_cell(v) for v in raw_df.iloc[hdr_idx].tolist()]
     headers = _dedupe_headers(header_cells)
 
-    df = raw_df.iloc[hdr_idx + 1 :].copy()
+    boundary = _detect_main_data_boundary(raw_df, hdr_idx)
+    df = raw_df.iloc[hdr_idx + 1 : boundary].copy()
     df.columns = headers
     df = _clean_dataframe(df)
     return df
@@ -178,6 +241,166 @@ def load_sheet_dataframe(filepath: str, sheet: str) -> pd.DataFrame:
         engine = "openpyxl" if ext in (".xlsx", ".xlsm") else "xlrd"
         raw_df = pd.read_excel(filepath, sheet_name=sheet, dtype=str, engine=engine, header=None)
     return _apply_inferred_header(raw_df)
+
+
+# ─── Supplementary section extraction ──────────────────────────────────────────
+
+def extract_sheet_supplementary(filepath: str, sheet: str = "Sheet1") -> Dict[str, Any]:
+    """
+    Extract supplementary information from a spreadsheet (reference tables,
+    legends, notes, pre-header metadata) without modifying the main data
+    parsing pipeline.
+    """
+    ext = os.path.splitext(filepath)[1].lower()
+    try:
+        if ext == ".csv":
+            raw_df: Optional[pd.DataFrame] = None
+            for enc in ["utf-8", "latin-1", "cp1252"]:
+                try:
+                    raw_df = pd.read_csv(filepath, encoding=enc, dtype=str, header=None)
+                    break
+                except UnicodeDecodeError:
+                    continue
+            if raw_df is None:
+                return _empty_supplementary()
+        else:
+            engine = "openpyxl" if ext in (".xlsx", ".xlsm") else "xlrd"
+            raw_df = pd.read_excel(
+                filepath, sheet_name=sheet, dtype=str, engine=engine, header=None
+            )
+    except Exception:
+        return _empty_supplementary()
+
+    if raw_df.empty:
+        return _empty_supplementary()
+
+    hdr_idx = _infer_header_row_index(raw_df)
+    boundary = _detect_main_data_boundary(raw_df, hdr_idx)
+
+    pre_header = _extract_pre_header_text(raw_df, hdr_idx)
+    sections = _parse_supplementary_sections(raw_df, boundary)
+
+    return {
+        "pre_header_text": pre_header,
+        "sections": sections,
+    }
+
+
+def _empty_supplementary() -> Dict[str, Any]:
+    return {"pre_header_text": [], "sections": []}
+
+
+def _extract_pre_header_text(raw_df: pd.DataFrame, hdr_idx: int) -> List[str]:
+    """Extract meaningful text from rows above the detected header row."""
+    lines: List[str] = []
+    for i in range(hdr_idx):
+        cells = [str(v).strip() for v in raw_df.iloc[i].tolist()]
+        non_empty = [c for c in cells if c and c.lower() not in ("nan", "none")]
+        if non_empty:
+            lines.append(" | ".join(non_empty))
+    return lines
+
+
+def _parse_supplementary_sections(
+    raw_df: pd.DataFrame, start_idx: int
+) -> List[Dict[str, Any]]:
+    """Parse supplementary content (reference tables, legends, notes)."""
+    n = len(raw_df)
+    if start_idx >= n:
+        return []
+
+    sections: List[Dict[str, Any]] = []
+    current: Optional[Dict[str, Any]] = None
+
+    i = start_idx
+    while i < n:
+        row_vals = [str(v).strip() for v in raw_df.iloc[i].tolist()]
+        indexed_non_empty = [
+            (idx, v)
+            for idx, v in enumerate(row_vals)
+            if v and v.lower() not in ("nan", "none")
+        ]
+
+        if not indexed_non_empty:
+            i += 1
+            continue
+
+        non_empty_vals = [v for _, v in indexed_non_empty]
+        row_text = " ".join(non_empty_vals)
+        row_lower = row_text.lower()
+
+        is_section_header = (
+            any(kw in row_lower for kw in SECTION_KEYWORDS)
+            and len(indexed_non_empty) <= 3
+        )
+
+        if is_section_header:
+            if current is not None:
+                sections.append(current)
+
+            stype = "notes"
+            if any(
+                kw in row_lower
+                for kw in ("reference", "rate", "benchmark", "pricing", "comparison")
+            ):
+                stype = "reference_table"
+            elif any(kw in row_lower for kw in ("legend", "colour", "color")):
+                stype = "legend"
+
+            current = {
+                "title": row_text,
+                "type": stype,
+                "raw_text": [],
+                "table_headers": [],
+                "table_data": [],
+                "_col_positions": [],
+            }
+            i += 1
+            continue
+
+        if current is None:
+            current = {
+                "title": "Additional Information",
+                "type": "notes",
+                "raw_text": [],
+                "table_headers": [],
+                "table_data": [],
+                "_col_positions": [],
+            }
+
+        if (
+            current["type"] == "reference_table"
+            and not current["table_headers"]
+            and len(indexed_non_empty) >= 3
+        ):
+            current["_col_positions"] = [idx for idx, _ in indexed_non_empty]
+            current["table_headers"] = list(non_empty_vals)
+            i += 1
+            continue
+
+        if current["table_headers"] and current["_col_positions"]:
+            row_dict: Dict[str, str] = {}
+            for h_idx, col_pos in enumerate(current["_col_positions"]):
+                if h_idx < len(current["table_headers"]) and col_pos < len(row_vals):
+                    val = row_vals[col_pos].strip()
+                    if val and val.lower() not in ("nan", "none"):
+                        row_dict[current["table_headers"][h_idx]] = val
+            if row_dict and len(row_dict) >= 2:
+                current["table_data"].append(row_dict)
+            elif non_empty_vals:
+                current["raw_text"].append(row_text)
+        else:
+            current["raw_text"].append(row_text)
+
+        i += 1
+
+    if current is not None:
+        sections.append(current)
+
+    for s in sections:
+        s.pop("_col_positions", None)
+
+    return sections
 
 
 # ─── Wide-format (size-as-columns) detection & unpivot ─────────────────────────

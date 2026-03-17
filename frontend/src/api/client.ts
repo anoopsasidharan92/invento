@@ -43,6 +43,8 @@ export interface PreviewContent {
   total_rows: number;
   file_id: string;
   taxonomy?: Taxonomy;
+  units_per_carton_mapped?: boolean;
+  total_carton_mapped?: boolean;
 }
 
 export interface DoneContent {
@@ -155,8 +157,8 @@ export class ChatClient {
     this.send("confirm_mapping", { mapping });
   }
 
-  updateCell(rowIndex: number, field: string, value: string): void {
-    this.send("update_cell", { row_index: rowIndex, field, value });
+  updateCell(rowIndex: number, field: string, value: string, applyAll = false): void {
+    this.send("update_cell", { row_index: rowIndex, field, value, apply_all: applyAll });
   }
 
   disconnect(): void {

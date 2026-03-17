@@ -211,6 +211,8 @@ class ChatSession:
         self.awaiting_enrichment_context: bool = False
         self.enrichment_needed: bool = False
         self.pending_inferred_context: Dict[str, str] = {}
+        self.supplementary_data: Optional[Dict] = None
+        self.supplementary_summary: Dict = {}
 
 
 async def ws_send(ws: WebSocket, msg_type: str, content):
@@ -266,6 +268,17 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                 meta = session.parsed.get("_meta", {})
                 sheet_info = session.parsed[session.sheet_name]
 
+                try:
+                    session.supplementary_data = inv_parser.extract_sheet_supplementary(
+                        filepath, session.sheet_name
+                    )
+                    session.supplementary_summary = agent.summarize_supplementary_context(
+                        session.supplementary_data
+                    )
+                except Exception:
+                    session.supplementary_data = None
+                    session.supplementary_summary = {}
+
                 await ws_send(websocket, "agent", (
                     f"Received **{session.original_filename}**. Analysing..."
                 ))
@@ -275,6 +288,41 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                 analysis = await agent.analyze_file(sheet_info, meta, session.sheet_name)
                 await ws_send(websocket, "agent", analysis)
                 await ws_progress(websocket, "Analysis complete", active=False)
+
+                # Step 1.1: report supplementary data if found
+                supp = session.supplementary_summary
+                if supp and any([
+                    supp.get("seller_name"),
+                    supp.get("reference_rates"),
+                    supp.get("pricing_notes"),
+                ]):
+                    supp_parts = []
+                    if supp.get("seller_name"):
+                        supp_parts.append(
+                            f"**Seller/Company**: {supp['seller_name']}"
+                        )
+                    if supp.get("data_sources"):
+                        supp_parts.append(
+                            f"**Data Sources**: {supp['data_sources']}"
+                        )
+                    if supp.get("reference_rates"):
+                        supp_parts.append(
+                            f"**Market Reference Rates**: "
+                            f"{len(supp['reference_rates'])} product benchmark(s) detected"
+                        )
+                    if supp.get("pricing_notes"):
+                        notes_preview = "; ".join(supp["pricing_notes"][:3])
+                        if len(notes_preview) > 200:
+                            notes_preview = notes_preview[:200] + "..."
+                        supp_parts.append(
+                            f"**Pricing Notes**: {notes_preview}"
+                        )
+                    await ws_send(
+                        websocket,
+                        "agent",
+                        "I also detected supplementary information in this sheet:\n"
+                        + "\n".join(f"- {p}" for p in supp_parts),
+                    )
 
                 # Step 1.2: inventory feasibility gate
                 is_inventory, reason, feasibility_conf = await agent.assess_inventory_feasibility(sheet_info)
@@ -461,20 +509,44 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                 row_idx = content.get("row_index")
                 field = content.get("field")
                 value = content.get("value", "")
+                apply_all = content.get("apply_all", False)  # for units_per_carton bulk apply
                 if (
                     session.normalized_df is not None
                     and isinstance(row_idx, int)
-                    and field in ("category", "sub_category")
+                    and field in ("category", "sub_category", "units_per_carton")
                     and 0 <= row_idx < len(session.normalized_df)
                 ):
-                    col_loc = session.normalized_df.columns.get_loc(field)
-                    session.normalized_df.iloc[row_idx, col_loc] = value
+                    df = session.normalized_df
+                    if field == "units_per_carton":
+                        # Ensure column exists
+                        if "units_per_carton" not in df.columns:
+                            df["units_per_carton"] = ""
+                        if "quantity_in_units" not in df.columns:
+                            df["quantity_in_units"] = ""
+                        rows_to_update = list(range(len(df))) if apply_all else [row_idx]
+                        for idx in rows_to_update:
+                            df.iat[idx, df.columns.get_loc("units_per_carton")] = value
+                            # Recalculate quantity_in_units = total_carton * units_per_carton
+                            try:
+                                tc = float(str(df.iat[idx, df.columns.get_loc("total_carton")]).replace(",", "")) if "total_carton" in df.columns else 0
+                                upc = float(str(value).replace(",", ""))
+                                qty = tc * upc
+                                df.iat[idx, df.columns.get_loc("quantity_in_units")] = str(int(qty) if qty == int(qty) else qty)
+                            except (ValueError, TypeError):
+                                pass
+                    else:
+                        col_loc = df.columns.get_loc(field)
+                        df.iloc[row_idx, col_loc] = value
                     _save_output(session.file_id, session.normalized_df)
                     await _send_preview(websocket, session.file_id, session.normalized_df)
                 continue
 
             # ── Confirm mapping ────────────────────────────────────────────────
             elif msg_type == "confirm_mapping":
+                if session.parsed is None or session.sheet_name is None:
+                    await ws_send(websocket, "error",
+                        "Session state was lost (likely a reconnect). Please re-upload your file.")
+                    continue
                 if "mapping" in content:
                     session.mapping = content["mapping"]
                 await _apply_and_save(websocket, session, db)
@@ -486,6 +558,10 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
 
 
 async def _apply_and_save(websocket: WebSocket, session: ChatSession, db: Session):
+    if session.parsed is None or session.sheet_name is None:
+        await ws_send(websocket, "error",
+            "Session state was lost (likely a reconnect). Please re-upload your file.")
+        return
     sheet_info = session.parsed[session.sheet_name]
 
     summary = agent.generate_mapping_summary(session.mapping, sheet_info["row_count"])
@@ -517,6 +593,22 @@ async def _apply_and_save(websocket: WebSocket, session: ChatSession, db: Sessio
     session.awaiting_enrichment_context = False
     session.enrichment_needed = _is_enrichment_needed(session.normalized_df)
     session.pending_inferred_context = {}
+
+    supp = session.supplementary_summary or {}
+    if supp:
+        if supp.get("seller_name"):
+            session.enrichment_profile["seller_name"] = supp["seller_name"]
+        if supp.get("reference_rates"):
+            ref_products = [
+                r.get("Product", r.get("product", ""))
+                for r in supp["reference_rates"]
+                if isinstance(r, dict)
+            ]
+            ref_products = [p for p in ref_products if p]
+            if ref_products:
+                session.enrichment_profile["reference_products"] = ", ".join(
+                    ref_products[:15]
+                )
 
     output_path, ordered_cols = _save_output(session.file_id, session.normalized_df)
     await _send_preview(websocket, session.file_id, session.normalized_df)
@@ -584,12 +676,28 @@ async def _send_preview(websocket: WebSocket, file_id: str, df: pd.DataFrame):
     rename_map = {k: NICE_COLUMN_NAMES.get(k, k) for k in ordered_cols}
     df_output = df[ordered_cols].rename(columns=rename_map)
     preview_rows = df_output.head(20).fillna("").to_dict(orient="records")
+
+    # Determine whether units_per_carton has real data in the df
+    upc_col = "units_per_carton"
+    upc_mapped = (
+        upc_col in df.columns
+        and df[upc_col].replace("", pd.NA).dropna().shape[0] > 0
+    )
+    # total_carton present and has data → user may need to enter units_per_carton
+    tc_col = "total_carton"
+    total_carton_mapped = (
+        tc_col in df.columns
+        and df[tc_col].replace("", pd.NA).dropna().shape[0] > 0
+    )
+
     await ws_send(websocket, "preview", {
         "columns": list(df_output.columns),
         "rows": preview_rows,
         "total_rows": len(df),
         "file_id": file_id,
         "taxonomy": CATEGORY_TAXONOMY,
+        "units_per_carton_mapped": upc_mapped,
+        "total_carton_mapped": total_carton_mapped,
     })
 
 

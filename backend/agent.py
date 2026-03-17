@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from langchain_ollama import OllamaLLM
 
@@ -846,6 +846,55 @@ async def classify_rows_enriched(
             cat, sub, conf = _apply_context_bias(cat, sub, 0.55, row, context)
             fallback.append((cat, sub, conf))
         return fallback
+
+
+# ─── Supplementary context analysis ────────────────────────────────────────────
+
+
+def summarize_supplementary_context(supplementary: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Deterministically extract useful context from supplementary sections
+    (pre-header text, reference tables, legends).  No LLM call needed.
+    """
+    if not supplementary:
+        return {}
+
+    summary: Dict[str, Any] = {
+        "seller_name": "",
+        "data_sources": "",
+        "reference_rates": [],
+        "pricing_notes": [],
+    }
+
+    _COMPANY_INDICATORS = [
+        "limited", "ltd", "inc", "corp", "sdn", "bhd",
+        "llc", "co.", "pte", "gmbh", "s.a.", "plc",
+    ]
+
+    for line in supplementary.get("pre_header_text", []):
+        ll = line.lower()
+        if not summary["seller_name"] and any(
+            ind in ll for ind in _COMPANY_INDICATORS
+        ):
+            name = line.split("\u2014")[0].split("|")[0].split("\u2013")[0].strip()
+            if name:
+                summary["seller_name"] = name
+        if not summary["data_sources"] and any(
+            kw in ll
+            for kw in ["source", "borong", "supply", "grocer", "market ref"]
+        ):
+            summary["data_sources"] = line.strip()
+
+    for section in supplementary.get("sections", []):
+        if section.get("type") == "reference_table" and section.get("table_data"):
+            summary["reference_rates"] = section["table_data"]
+            title = section.get("title", "")
+            if "source" in title.lower() and not summary["data_sources"]:
+                summary["data_sources"] = title
+        elif section.get("type") in ("legend", "notes"):
+            summary["pricing_notes"].extend(section.get("raw_text", []))
+
+    return summary
 
 
 # ─── Agent functions ───────────────────────────────────────────────────────────
