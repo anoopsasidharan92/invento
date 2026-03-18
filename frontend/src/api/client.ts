@@ -161,6 +161,10 @@ export class ChatClient {
     this.send("update_cell", { row_index: rowIndex, field, value, apply_all: applyAll });
   }
 
+  deleteRow(rowIndex: number): void {
+    this.send("delete_row", { row_index: rowIndex });
+  }
+
   disconnect(): void {
     this.manualClose = true;
     if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }

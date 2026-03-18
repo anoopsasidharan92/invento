@@ -1,5 +1,6 @@
 import { ComponentType } from "react";
 import InventoryTool from "./InventoryTool";
+import PollenBDTool from "./PollenBDTool";
 
 export interface ToolDefinition {
   id: string;
@@ -23,16 +24,16 @@ const tools: ToolDefinition[] = [
     status: "live",
     component: InventoryTool,
   },
+  {
+    id: "pollen-bd",
+    name: "Pollen BD Agent",
+    description: "AI-powered lead finder for FMCG brands with excess inventory. Review, score, and draft outreach.",
+    icon: "🌱",
+    color: "bg-green-900",
+    status: "live",
+    component: PollenBDTool,
+  },
   // ── Add new tools below ────────────────────────────────────────────────────
-  // {
-  //   id: "price-checker",
-  //   name: "Price Checker",
-  //   description: "Compare product prices across supplier sheets and flag anomalies.",
-  //   icon: "💰",
-  //   color: "bg-emerald-700",
-  //   status: "coming-soon",
-  //   component: () => null,
-  // },
 ];
 
 export default tools;

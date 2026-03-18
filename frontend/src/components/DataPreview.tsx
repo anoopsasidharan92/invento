@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { ChevronLeft, ChevronRight, Download, Table2, Pencil } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Table2, Pencil, Trash2 } from "lucide-react";
 import { PreviewContent, Taxonomy, getDownloadUrl } from "../api/client";
 
 const PAGE_SIZE = 10;
@@ -14,6 +14,7 @@ const EDITABLE_COLUMNS = new Set(["Category", "Sub Category"]);
 interface Props {
   preview: PreviewContent;
   onCellEdit?: (rowIndex: number, field: string, value: string, applyAll?: boolean) => void;
+  onDeleteRow?: (rowIndex: number) => void;
 }
 
 interface EditingCell {
@@ -21,7 +22,7 @@ interface EditingCell {
   col: string;
 }
 
-export default function DataPreview({ preview, onCellEdit }: Props) {
+export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props) {
   const [page, setPage] = useState(0);
   const [editing, setEditing] = useState<EditingCell | null>(null);
   const [localRows, setLocalRows] = useState<Record<string, string>[]>(preview.rows);
@@ -91,6 +92,14 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
       if (onCellEdit) onCellEdit(absoluteIdx, "units_per_carton", trimmed, applyAll);
     },
     [onCellEdit]
+  );
+
+  const handleDeleteRow = useCallback(
+    (absoluteIdx: number) => {
+      setLocalRows((prev) => prev.filter((_, i) => i !== absoluteIdx));
+      if (onDeleteRow) onDeleteRow(absoluteIdx);
+    },
+    [onDeleteRow]
   );
 
   const renderCell = (row: Record<string, string>, pageRowIdx: number, col: string) => {
@@ -230,10 +239,10 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
         <a
           href={getDownloadUrl(preview.file_id)}
           download
-          className="ml-auto flex items-center gap-1.5 text-xs text-ui-text hover:text-black font-medium transition-colors"
+          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium text-ui-text bg-white border border-ui-border shadow-sm hover:border-gray-400 hover:bg-gray-50 transition-all"
         >
           <Download className="w-3.5 h-3.5" />
-          Download
+          Download CSV
         </a>
       </div>
 
@@ -255,24 +264,39 @@ export default function DataPreview({ preview, onCellEdit }: Props) {
                   )}
                 </th>
               ))}
+              {onDeleteRow && <th className="px-2 py-3 w-8" />}
             </tr>
           </thead>
           <tbody>
-            {visibleRows.map((row, i) => (
-              <tr
-                key={i}
-                className="border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors"
-              >
-                {preview.columns.map((col) => (
-                  <td
-                    key={col}
-                    className="px-4 py-2.5 text-ui-text whitespace-nowrap"
-                  >
-                    {renderCell(row, i, col)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {visibleRows.map((row, i) => {
+              const absoluteIdx = page * PAGE_SIZE + i;
+              return (
+                <tr
+                  key={i}
+                  className="group/row border-b border-gray-100 last:border-none hover:bg-gray-50 transition-colors"
+                >
+                  {preview.columns.map((col) => (
+                    <td
+                      key={col}
+                      className="px-4 py-2.5 text-ui-text whitespace-nowrap"
+                    >
+                      {renderCell(row, i, col)}
+                    </td>
+                  ))}
+                  {onDeleteRow && (
+                    <td className="px-2 py-2.5 text-right">
+                      <button
+                        onClick={() => handleDeleteRow(absoluteIdx)}
+                        title="Remove row"
+                        className="opacity-0 group-hover/row:opacity-100 p-1 rounded hover:bg-red-50 hover:text-red-500 text-gray-300 transition-all"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
