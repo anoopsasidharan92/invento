@@ -4,6 +4,8 @@ import asyncio
 import json
 import os
 import re
+import subprocess
+import sys
 import uuid
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -24,6 +26,116 @@ import parser as inv_parser
 from database import get_db, init_db, save_inventory
 from schemas import UploadResponse, SheetInfo
 
+# ─── Pollen BD Agent paths ─────────────────────────────────────────────────────
+POLLEN_DIR           = Path(__file__).parent.parent / "pollen-bd-agent"
+POLLEN_PROJECTS_DIR  = POLLEN_DIR / "projects"
+POLLEN_PROJECTS_FILE = POLLEN_DIR / "projects.json"
+
+
+# ─── Pollen Project Helpers ────────────────────────────────────────────────────
+
+def _pollen_project_dir(pid: str) -> Path:
+    return POLLEN_PROJECTS_DIR / pid
+
+
+def _pollen_project_paths(pid: str):
+    """Returns (config_path, data_path, log_path) for a project."""
+    d = _pollen_project_dir(pid)
+    return d / "config.json", d / "data" / "leads.json", d / "data" / "agent.log"
+
+
+def _pollen_load_projects() -> list:
+    if POLLEN_PROJECTS_FILE.exists():
+        with open(POLLEN_PROJECTS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def _pollen_save_projects(projects: list):
+    POLLEN_PROJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(POLLEN_PROJECTS_FILE, "w") as f:
+        json.dump(projects, f, indent=2)
+
+
+def _pollen_migrate_legacy():
+    """If old single-project config.json exists, migrate it into projects/default/."""
+    import shutil, datetime as _dt
+    old_config = POLLEN_DIR / "config.json"
+    if not old_config.exists():
+        return
+    projects = _pollen_load_projects()
+    if any(p["id"] == "default" for p in projects):
+        return
+    default_dir = POLLEN_PROJECTS_DIR / "default"
+    (default_dir / "data").mkdir(parents=True, exist_ok=True)
+    shutil.copy2(old_config, default_dir / "config.json")
+    old_data = POLLEN_DIR / "data" / "leads.json"
+    if old_data.exists():
+        shutil.copy2(old_data, default_dir / "data" / "leads.json")
+    old_log = POLLEN_DIR / "data" / "agent.log"
+    if old_log.exists():
+        shutil.copy2(old_log, default_dir / "data" / "agent.log")
+    projects.append({
+        "id": "default",
+        "name": "Default",
+        "created_at": _dt.datetime.now().isoformat(),
+    })
+    _pollen_save_projects(projects)
+    old_config.rename(POLLEN_DIR / "config.json.migrated")
+
+
+def _pollen_load_leads(data_path: Path) -> dict:
+    if data_path.exists():
+        with open(data_path) as f:
+            return json.load(f)
+    return {}
+
+
+def _pollen_save_leads(data_path: Path, leads: dict):
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(data_path, "w") as f:
+        json.dump(leads, f, indent=2)
+
+
+def _pollen_status_path(pid: str) -> Path:
+    return _pollen_project_dir(pid) / "data" / "status.json"
+
+
+def _pollen_write_status(pid: str, job: str, state: str, detail: str = ""):
+    import datetime as _dt
+    path = _pollen_status_path(pid)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({
+            "job":    job,    # "run" | "cleanup" | "idle"
+            "state":  state,  # "running" | "done" | "error"
+            "detail": detail,
+            "ts":     _dt.datetime.now().isoformat(),
+        }, f)
+
+
+def _pollen_read_status(pid: str) -> dict:
+    path = _pollen_status_path(pid)
+    if path.exists():
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"job": "idle", "state": "done", "detail": "", "ts": ""}
+
+
+# Registry of running agent subprocesses keyed by project id
+_pollen_procs: Dict[str, "subprocess.Popen[bytes]"] = {}
+
+
+def _pollen_get_project(pid: str) -> dict:
+    projects = _pollen_load_projects()
+    for p in projects:
+        if p["id"] == pid:
+            return p
+    raise HTTPException(404, f"Project '{pid}' not found")
+
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
@@ -35,7 +147,7 @@ app = FastAPI(title="Inventory Parser API", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -45,6 +157,7 @@ app.add_middleware(
 @app.on_event("startup")
 def on_startup():
     init_db()
+    _pollen_migrate_legacy()
 
 
 # ─── REST Endpoints ────────────────────────────────────────────────────────────
@@ -102,6 +215,813 @@ async def download_clean_template_file(file_id: str):
     if not path.exists():
         raise HTTPException(404, "No clean template output file found for this session.")
     return FileResponse(str(path), media_type="text/csv", filename=path.name)
+
+
+# ─── Pollen BD Agent API ───────────────────────────────────────────────────────
+
+# ── Project Management ────────────────────────────────────────────────────────
+
+@app.get("/pollen/projects")
+def pollen_list_projects():
+    """List all BD agent projects with their configured status."""
+    projects = _pollen_load_projects()
+    result = []
+    for p in projects:
+        cfg_path, _, _ = _pollen_project_paths(p["id"])
+        result.append({**p, "configured": cfg_path.exists()})
+    return result
+
+
+@app.post("/pollen/projects", status_code=201)
+def pollen_create_project(data: dict):
+    """Create a new BD agent project."""
+    import uuid, datetime as _dt
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Project name is required")
+    pid = str(uuid.uuid4())[:8]
+    project_dir = _pollen_project_dir(pid)
+    (project_dir / "data").mkdir(parents=True, exist_ok=True)
+    projects = _pollen_load_projects()
+    entry = {"id": pid, "name": name, "created_at": _dt.datetime.now().isoformat()}
+    projects.append(entry)
+    _pollen_save_projects(projects)
+    return {**entry, "configured": False}
+
+
+@app.patch("/pollen/projects/{pid}")
+def pollen_rename_project(pid: str, data: dict):
+    """Rename a project."""
+    _pollen_get_project(pid)
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Project name is required")
+    projects = _pollen_load_projects()
+    for p in projects:
+        if p["id"] == pid:
+            p["name"] = name
+            break
+    _pollen_save_projects(projects)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    updated = next(p for p in projects if p["id"] == pid)
+    return {**updated, "configured": cfg_path.exists()}
+
+
+@app.delete("/pollen/projects/{pid}", status_code=204)
+def pollen_delete_project(pid: str):
+    """Delete a project and all its data."""
+    import shutil
+    _pollen_get_project(pid)
+    project_dir = _pollen_project_dir(pid)
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
+    projects = _pollen_load_projects()
+    projects = [p for p in projects if p["id"] != pid]
+    _pollen_save_projects(projects)
+
+
+# ── Project-scoped endpoints ──────────────────────────────────────────────────
+
+@app.get("/pollen/{pid}/leads")
+def pollen_leads(pid: str, status: str = "", priority: str = ""):
+    _pollen_get_project(pid)
+    _, data_path, _ = _pollen_project_paths(pid)
+    leads = _pollen_load_leads(data_path)
+    items = list(leads.values())
+    if status:
+        items = [l for l in items if l.get("status") == status]
+    if priority:
+        items = [l for l in items if l.get("priority") == priority]
+    priority_order = {"hot": 0, "warm": 1, "cold": 2}
+    items.sort(key=lambda x: priority_order.get(x.get("priority", "cold"), 2))
+    return items
+
+
+@app.get("/pollen/{pid}/leads/starred")
+def pollen_starred_leads(pid: str):
+    _pollen_get_project(pid)
+    _, data_path, _ = _pollen_project_paths(pid)
+    leads = _pollen_load_leads(data_path)
+    return [l for l in leads.values() if l.get("starred")]
+
+
+@app.patch("/pollen/{pid}/leads/{lid}")
+def pollen_update_lead(pid: str, lid: str, data: dict):
+    _pollen_get_project(pid)
+    _, data_path, _ = _pollen_project_paths(pid)
+    leads = _pollen_load_leads(data_path)
+    if lid not in leads:
+        raise HTTPException(404, "Lead not found")
+    for field in ("status", "notes", "starred"):
+        if field in data:
+            leads[lid][field] = data[field]
+    _pollen_save_leads(data_path, leads)
+    return leads[lid]
+
+
+@app.delete("/pollen/{pid}/leads/{lid}", status_code=204)
+def pollen_delete_lead(pid: str, lid: str):
+    _pollen_get_project(pid)
+    _, data_path, _ = _pollen_project_paths(pid)
+    leads = _pollen_load_leads(data_path)
+    if lid not in leads:
+        raise HTTPException(404, "Lead not found")
+    del leads[lid]
+    _pollen_save_leads(data_path, leads)
+
+
+@app.get("/pollen/{pid}/stats")
+def pollen_stats(pid: str):
+    _pollen_get_project(pid)
+    _, data_path, _ = _pollen_project_paths(pid)
+    leads = _pollen_load_leads(data_path)
+    items = list(leads.values())
+    return {
+        "total":     len(items),
+        "new":       sum(1 for l in items if l.get("status") == "new"),
+        "hot":       sum(1 for l in items if l.get("priority") == "hot"),
+        "contacted": sum(1 for l in items if l.get("status") == "contacted"),
+        "reviewed":  sum(1 for l in items if l.get("status") == "reviewed"),
+        "starred":   sum(1 for l in items if l.get("starred")),
+    }
+
+
+@app.get("/pollen/{pid}/context")
+def pollen_agent_context(pid: str):
+    """Return the full context the AI agent uses when qualifying leads."""
+    _pollen_get_project(pid)
+    cfg_path, data_path, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Not configured yet")
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+
+    schema = cfg.get("result_schema", {})
+    thresholds = cfg.get("score_thresholds", {})
+    hot_min = thresholds.get("hot_min", 8)
+    warm_min = thresholds.get("warm_min", 5)
+
+    strong = "\n".join(f"- {s}" for s in cfg.get("strong_signals", []))
+    weak = "\n".join(f"- {s}" for s in cfg.get("weak_signals", []))
+    categories = "|".join(schema.get("categories", []))
+    geographies = "|".join(schema.get("geographies", []))
+    signal_types = "|".join(schema.get("signal_types", []))
+    lead_field = schema.get("lead_name_field", "company_name")
+    sender = cfg.get("sender_name", "")
+    company = cfg.get("sender_company", "")
+    company_desc = cfg.get("sender_description", "")
+
+    qualifier_prompt = f"""{cfg.get('qualifier_context', '')}
+
+Your job: evaluate a raw search result and decide if it is a good prospective lead.
+
+Strong signals:
+{strong}
+
+Weak or irrelevant signals:
+{weak}
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "{lead_field}": "...",
+  "category": "{categories}",
+  "country": "{geographies}",
+  "fit_score": 1-10,
+  "fit_reason": "1-2 sentence reason for the score",
+  "priority": "hot|warm|cold",
+  "outreach_email": {{
+    "subject": "...",
+    "body": "..."
+  }},
+  "source_url": "...",
+  "signal_type": "{signal_types}",
+  "raw_snippet": "..."
+}}
+
+fit_score guide: {hot_min}-10 = hot (clear signal), {warm_min}-{hot_min - 1} = warm (indirect signal), 1-{warm_min - 1} = cold (weak fit).
+priority mirrors score: {hot_min}-10=hot, {warm_min}-{hot_min - 1}=warm, 1-{warm_min - 1}=cold.
+
+The outreach email should:
+- Be from {sender} at {company} ({company_desc})
+- Reference the specific signal you found (be specific, not generic)
+- Be concise: 4-6 sentences max
+- Subject line: compelling, not salesy
+- Do NOT invent facts. Only reference what's in the snippet.""".strip()
+
+    starred_leads = []
+    if data_path.exists():
+        try:
+            with open(data_path) as f:
+                all_leads = json.load(f)
+            starred_leads = [
+                {
+                    "company_name": l.get("company_name", l.get("brand_name", "?")),
+                    "signal_type": l.get("signal_type", "?"),
+                    "country": l.get("country", "?"),
+                    "raw_snippet": (l.get("raw_snippet", "") or "")[:150],
+                    "fit_score": l.get("fit_score"),
+                    "fit_reason": l.get("fit_reason", ""),
+                }
+                for l in all_leads.values() if l.get("starred")
+            ]
+        except Exception:
+            pass
+
+    starred_context = ""
+    if starred_leads:
+        lines = "\n".join(
+            f"  - {l['company_name']} | signal={l['signal_type']} | country={l['country']} | snippet={l['raw_snippet'][:120]}"
+            for l in starred_leads
+        )
+        starred_context = (
+            f"The user has flagged these as GREAT leads (starred). "
+            f"Use them to calibrate your scoring — companies with similar profiles, signals, or language should score higher:\n{lines}"
+        )
+
+    return {
+        "config": {
+            "agent_name": cfg.get("agent_name", ""),
+            "sender_name": cfg.get("sender_name", ""),
+            "sender_company": cfg.get("sender_company", ""),
+            "sender_description": cfg.get("sender_description", ""),
+            "qualifier_context": cfg.get("qualifier_context", ""),
+            "ideal_customer_profile": cfg.get("ideal_customer_profile", ""),
+            "what_we_offer": cfg.get("what_we_offer", ""),
+        },
+        "strong_signals": cfg.get("strong_signals", []),
+        "weak_signals": cfg.get("weak_signals", []),
+        "search_queries": cfg.get("search_queries", []),
+        "result_schema": schema,
+        "score_thresholds": thresholds,
+        "qualifier_prompt": qualifier_prompt,
+        "starred_leads": starred_leads,
+        "starred_context": starred_context,
+        "search_geo": cfg.get("search_geo", ""),
+        "search_channels": cfg.get("search_channels", ["linkedin", "google", "news"]),
+        "max_results_per_query": cfg.get("max_results_per_query", 5),
+        "batch_size": cfg.get("batch_size", 0),
+    }
+
+
+@app.get("/pollen/{pid}/log")
+def pollen_log(pid: str):
+    _pollen_get_project(pid)
+    _, _, log_path = _pollen_project_paths(pid)
+    if log_path.exists():
+        lines = log_path.read_text().splitlines()[-50:]
+        return {"log": "\n".join(lines)}
+    return {"log": "No log yet."}
+
+
+@app.get("/pollen/{pid}/status")
+def pollen_status(pid: str):
+    """Returns current job status for this project."""
+    _pollen_get_project(pid)
+    status = _pollen_read_status(pid)
+    # If the job is "running" but the PID-tracked process is gone, auto-clear it.
+    # We use the status file's own timestamp — if it's been running for >30 min, mark stale.
+    if status.get("state") == "running" and status.get("ts"):
+        import datetime as _dt
+        try:
+            started = _dt.datetime.fromisoformat(status["ts"])
+            age = (_dt.datetime.now() - started).total_seconds()
+            if age > 1800:  # 30 minutes max
+                _pollen_write_status(pid, status.get("job", "run"), "done", "timed out")
+                status = _pollen_read_status(pid)
+        except Exception:
+            pass
+    return status
+
+
+@app.post("/pollen/{pid}/run")
+def pollen_run(pid: str):
+    """Trigger a manual agent run in the background."""
+    _pollen_get_project(pid)
+    # Reject if a job is already running
+    current = _pollen_read_status(pid)
+    if current.get("state") == "running":
+        raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
+    project_dir = str(_pollen_project_dir(pid))
+    agent_script = str(POLLEN_DIR / "agent.py")
+    venv_python = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    env = os.environ.copy()
+    pollen_env = POLLEN_DIR / ".env"
+    if pollen_env.exists():
+        for line in pollen_env.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    try:
+        _pollen_write_status(pid, "run", "running", "Agent searching for leads…")
+        proc = subprocess.Popen(
+            [venv_python, agent_script, "--project-dir", project_dir],
+            cwd=str(POLLEN_DIR),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _pollen_procs[pid] = proc
+        # Background thread to mark done when process exits
+        import threading
+        def _watch(p, _pid):
+            p.wait()
+            _pollen_procs.pop(_pid, None)
+            # Only update status if it wasn't already set to stopped/error
+            current = _pollen_read_status(_pid)
+            if current.get("state") == "running":
+                _pollen_write_status(_pid, "run", "done", "Run complete")
+        threading.Thread(target=_watch, args=(proc, pid), daemon=True).start()
+        return {"status": "started"}
+    except Exception as e:
+        _pollen_write_status(pid, "run", "error", str(e))
+        raise HTTPException(500, f"Failed to start agent: {e}")
+
+
+@app.post("/pollen/{pid}/stop")
+def pollen_stop(pid: str):
+    """Stop a running agent for this project."""
+    _pollen_get_project(pid)
+    proc = _pollen_procs.pop(pid, None)
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    _pollen_write_status(pid, "run", "done", "Stopped by user")
+    return {"status": "stopped"}
+
+
+@app.post("/pollen/{pid}/cleanup")
+def pollen_cleanup(pid: str):
+    """Run the AI cleanup agent (dedup + archive removal) in the foreground and return a summary."""
+    _pollen_get_project(pid)
+    current = _pollen_read_status(pid)
+    if current.get("state") == "running":
+        raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
+    project_dir   = str(_pollen_project_dir(pid))
+    cleanup_script = str(POLLEN_DIR / "cleanup.py")
+    venv_python   = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    env = os.environ.copy()
+    pollen_env = POLLEN_DIR / ".env"
+    if pollen_env.exists():
+        for line in pollen_env.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    _pollen_write_status(pid, "cleanup", "running", "Scanning for duplicates…")
+    try:
+        result = subprocess.run(
+            [venv_python, cleanup_script, "--project-dir", project_dir],
+            cwd=str(POLLEN_DIR),
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if result.returncode != 0:
+            _pollen_write_status(pid, "cleanup", "error", result.stderr[:200])
+            raise HTTPException(500, f"Cleanup failed: {result.stderr[:500]}")
+        summary_path = Path(project_dir) / "data" / "cleanup_summary.json"
+        if summary_path.exists():
+            with open(summary_path) as f:
+                summary = json.load(f)
+        else:
+            summary = {"total_removed": 0, "remaining": 0}
+        detail = f"Removed {summary.get('total_removed', 0)} duplicates, {summary.get('remaining', 0)} leads remain"
+        _pollen_write_status(pid, "cleanup", "done", detail)
+        return summary
+    except subprocess.TimeoutExpired:
+        _pollen_write_status(pid, "cleanup", "error", "Timed out")
+        raise HTTPException(504, "Cleanup timed out")
+    except HTTPException:
+        raise
+    except Exception as e:
+        _pollen_write_status(pid, "cleanup", "error", str(e))
+        raise HTTPException(500, f"Failed to run cleanup: {e}")
+
+
+@app.patch("/pollen/{pid}/config")
+def pollen_patch_config(pid: str, payload: dict):
+    """Patch specific fields in a project's config.json."""
+    _pollen_get_project(pid)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Config not found. Complete onboarding first.")
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+    cfg.update(payload)
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    return {"ok": True}
+
+
+@app.get("/pollen/{pid}/config/status")
+def pollen_config_status(pid: str):
+    """Returns whether a config exists for this project."""
+    _pollen_get_project(pid)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    return {"configured": cfg_path.exists()}
+
+
+@app.get("/pollen/{pid}/config")
+def pollen_config_get(pid: str):
+    _pollen_get_project(pid)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Not configured yet")
+    with open(cfg_path) as f:
+        return json.load(f)
+
+
+@app.post("/pollen/{pid}/config")
+def pollen_config_save(pid: str, data: dict):
+    _pollen_get_project(pid)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(cfg_path, "w") as f:
+        json.dump(data, f, indent=2)
+    return {"ok": True}
+
+
+@app.websocket("/pollen/ws/onboard")
+async def pollen_onboard(ws: WebSocket, project_id: str = ""):
+    """
+    Onboarding chat for a specific project.
+    project_id must be passed as a query parameter: ?project_id=<pid>
+    Messages: {type: "user"|"agent"|"config_ready"|"error", content: ...}
+    """
+    import requests as _requests
+
+    await ws.accept()
+
+    if not project_id:
+        await ws.send_text(json.dumps({"type": "error", "content": "project_id query parameter is required"}))
+        await ws.close()
+        return
+
+    try:
+        _pollen_get_project(project_id)
+    except HTTPException:
+        await ws.send_text(json.dumps({"type": "error", "content": f"Project not found: {project_id}"}))
+        await ws.close()
+        return
+
+    cfg_path, _, _ = _pollen_project_paths(project_id)
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def ollama_chat(messages: list, system: str) -> str:
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        resp = _requests.post(OLLAMA_URL, json=payload, timeout=120)
+        resp.raise_for_status()
+        return resp.json()["message"]["content"].strip()
+
+    SYSTEM = """You are a setup assistant for a BD (business development) automation agent.
+Your job is to gather enough information to configure the agent for this user's specific business.
+
+Ask questions ONE AT A TIME in a natural conversation. Cover these areas:
+1. What does their company do and what's their core value proposition?
+2. What do they offer to leads — why would a lead care?
+3. Who exactly are they trying to reach? (company type, role, industry, geography)
+4. What specific situations or events signal a good lead? (e.g. excess stock, restructuring, market exit, new funding)
+5. What should be ignored — what looks relevant but isn't?
+6. Who is sending the outreach — name, title, company?
+
+Once you have enough detail (usually 5-7 exchanges), respond with ONLY this JSON block (nothing before or after):
+
+<CONFIG>
+{
+  "agent_name": "...",
+  "sender_name": "...",
+  "sender_company": "...",
+  "sender_description": "role | one-line company description",
+  "qualifier_context": "2-3 sentence paragraph: who you are, what a good lead looks like, and what you offer them. Written for an AI evaluating search results.",
+  "ideal_customer_profile": "Specific description of the ideal target company: type, size, situation, geography, and what makes them a perfect fit.",
+  "what_we_offer": "One paragraph: what your company offers leads and why they should respond.",
+  "strong_signals": [
+    "Specific observable signal that indicates a great lead — be concrete, not generic",
+    "..."
+  ],
+  "weak_signals": [
+    "What looks relevant but should score low or be ignored",
+    "..."
+  ],
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": ["..."],
+    "geographies": ["..."],
+    "signal_types": ["snake_case_signal_name", "..."]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "signal_name",
+      "queries": ["specific search query", "another specific query", "..."]
+    }
+  ],
+  "search_channels": ["linkedin", "google", "news"],
+  "max_results_per_query": 5,
+  "search_geo": "us"
+}
+</CONFIG>
+
+Rules for search_queries:
+- Queries run verbatim on the selected channels. Make them specific — include industry terms, geography, company types, trigger events.
+- Bad: "FMCG expansion MY". Good: "FMCG distributor warehouse clearance Malaysia 2024".
+- Generate 3-5 signal groups, each with 4-6 queries.
+- Cover different angles: seller signals, buyer signals, event triggers, geography variations.
+
+For search_channels — choose an ordered priority list from:
+  "linkedin"   → LinkedIn company pages (great for B2B, headcount signals, job posts)
+  "reddit"     → Reddit communities (great for consumer brands, community buzz, complaints)
+  "instagram"  → Instagram brand pages (great for DTC, fashion, food & bev)
+  "facebook"   → Facebook pages (great for local businesses, retail, classifieds)
+  "news"       → Google News (great for press releases, funding, restructuring signals)
+  "google"     → Plain Google search (broad fallback, always useful)
+
+Pick 2-4 channels most relevant to the target market. Order by most-likely-to-yield signal.
+Example for B2B supply chain: ["linkedin", "news", "google"]
+Example for DTC/consumer brands: ["instagram", "facebook", "reddit", "google"]
+"""
+
+    history: list[dict] = []
+
+    # Kick off the conversation
+    init_msg = "Hello, I'd like to set up the BD agent for my business."
+    opening_text = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: ollama_chat([{"role": "user", "content": init_msg}], SYSTEM)
+    )
+    history.append({"role": "user",      "content": init_msg})
+    history.append({"role": "assistant", "content": opening_text})
+    await ws.send_text(json.dumps({"type": "agent", "content": opening_text}))
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            user_text = msg.get("content", "").strip()
+            if not user_text:
+                continue
+
+            history.append({"role": "user", "content": user_text})
+
+            reply = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: ollama_chat(history, SYSTEM)
+            )
+            history.append({"role": "assistant", "content": reply})
+
+            if "<CONFIG>" in reply and "</CONFIG>" in reply:
+                raw_cfg = reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    cfg = json.loads(raw_cfg)
+                    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+                    with open(cfg_path, "w") as f:
+                        json.dump(cfg, f, indent=2)
+                    await ws.send_text(json.dumps({"type": "config_ready", "content": cfg}))
+                except json.JSONDecodeError as e:
+                    await ws.send_text(json.dumps({
+                        "type": "agent",
+                        "content": f"I had a problem generating the config ({e}). Let me try again — can you confirm the key details?"
+                    }))
+            else:
+                await ws.send_text(json.dumps({"type": "agent", "content": reply}))
+
+    except WebSocketDisconnect:
+        pass
+
+
+@app.websocket("/pollen/ws/correct")
+async def pollen_correct(ws: WebSocket, project_id: str = ""):
+    """
+    Lead correction chat for a specific project.
+    project_id must be passed as a query parameter: ?project_id=<pid>
+    Messages: {type: "user"|"agent"|"config_ready"|"error", content: ...}
+    """
+    import requests as _requests
+
+    await ws.accept()
+
+    if not project_id:
+        await ws.send_text(json.dumps({"type": "error", "content": "project_id query parameter is required"}))
+        await ws.close()
+        return
+
+    try:
+        _pollen_get_project(project_id)
+    except HTTPException:
+        await ws.send_text(json.dumps({"type": "error", "content": f"Project not found: {project_id}"}))
+        await ws.close()
+        return
+
+    cfg_path, data_path, _ = _pollen_project_paths(project_id)
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def ollama_chat(messages: list, system: str) -> str:
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        resp = _requests.post(OLLAMA_URL, json=payload, timeout=120)
+        resp.raise_for_status()
+        return resp.json()["message"]["content"].strip()
+
+    try:
+        with open(cfg_path) as f:
+            current_cfg = json.load(f)
+    except Exception:
+        await ws.send_text(json.dumps({"type": "error", "content": "No config found. Please complete onboarding first."}))
+        return
+
+    leads_sample = []
+    starred_leads = []
+    if data_path.exists():
+        try:
+            with open(data_path) as f:
+                all_leads = json.load(f)
+            leads_list = list(all_leads.values())
+            starred_leads = [l for l in leads_list if l.get("starred")]
+            leads_sample = leads_list[:6]
+        except Exception:
+            pass
+
+    leads_summary = "\n".join([
+        f"- {l.get('company_name','?')} | score={l.get('fit_score','?')} | signal={l.get('signal_type','?')} | country={l.get('country','?')} | reason={l.get('fit_reason','?')[:80]}"
+        for l in leads_sample
+    ]) or "No leads generated yet."
+
+    starred_summary = "\n".join([
+        f"- {l.get('company_name','?')} | signal={l.get('signal_type','?')} | country={l.get('country','?')} | snippet={l.get('raw_snippet','')[:120]} | reason={l.get('fit_reason','?')[:100]}"
+        for l in starred_leads
+    ]) if starred_leads else ""
+
+    current_queries = "\n".join([
+        f"  [{g['signal']}]: " + " / ".join(g['queries'])
+        for g in current_cfg.get("search_queries", [])
+    ])
+
+    starred_section = f"""
+The user has marked the following leads as GREAT examples (starred ⭐). These are the kind of companies to find MORE of:
+{starred_summary}
+
+Use these examples to understand what specific company types, signals, and language patterns work well. Craft new search queries that would surface more companies like these.
+""" if starred_summary else ""
+
+    icp = current_cfg.get("ideal_customer_profile", "")
+    what_we_offer = current_cfg.get("what_we_offer", "")
+
+    # Pre-escape for safe embedding in the f-string CONFIG template
+    qualifier_context_esc = current_cfg.get("qualifier_context", "").replace('"', '\\"')
+    icp_esc = icp.replace('"', '\\"')
+    what_we_offer_esc = what_we_offer.replace('"', '\\"')
+
+    # Serialise current values so the LLM can carry them forward verbatim
+    current_strong  = json.dumps(current_cfg.get("strong_signals", []), ensure_ascii=False)
+    current_weak    = json.dumps(current_cfg.get("weak_signals", []), ensure_ascii=False)
+    current_cats    = json.dumps(current_cfg.get("result_schema", {}).get("categories", []), ensure_ascii=False)
+    current_geos    = json.dumps(current_cfg.get("result_schema", {}).get("geographies", []), ensure_ascii=False)
+    current_sigs    = json.dumps(current_cfg.get("result_schema", {}).get("signal_types", []), ensure_ascii=False)
+    current_queries_json  = json.dumps(current_cfg.get("search_queries", []), indent=4, ensure_ascii=False)
+    current_thresholds    = json.dumps(current_cfg.get("score_thresholds", {"hot_min": 8, "warm_min": 5, "save_min": 4}), ensure_ascii=False)
+    current_channels      = json.dumps(current_cfg.get("search_channels", ["linkedin", "google", "news"]), ensure_ascii=False)
+
+    SYSTEM = f"""You are a lead generation strategist making targeted corrections to a BD agent's config.
+
+CURRENT CONFIG (your baseline — preserve everything the user has NOT complained about):
+- Qualifier context: {current_cfg.get('qualifier_context', '')}
+- Ideal customer profile: {icp}
+- What we offer: {what_we_offer}
+- Sender: {current_cfg.get('sender_name', '')} at {current_cfg.get('sender_company', '')} ({current_cfg.get('sender_description', '')})
+- Strong signals: {current_strong}
+- Weak signals: {current_weak}
+- Geographies: {current_geos}
+- Categories: {current_cats}
+- Signal types: {current_sigs}
+- Score thresholds: {current_thresholds}
+- Search channels (priority order): {current_channels}
+- Search geo: {current_cfg.get('search_geo', '')}
+- Max results per query: {current_cfg.get('max_results_per_query', 5)}
+
+Current search queries:
+{current_queries}
+
+Sample of leads generated so far:
+{leads_summary}
+{starred_section}
+
+INSTRUCTIONS:
+- The user is describing a SPECIFIC problem with the current leads — do NOT rewrite everything.
+- Only change the fields that are directly relevant to the user's feedback. Carry forward all other values exactly as they are above.
+- If the user says queries are too generic → update search_queries only.
+- If the user says wrong geography → update geographies and search_queries only.
+- If the user says wrong type of companies → update strong_signals, weak_signals, and search_queries.
+- If the user says context is wrong → update qualifier_context and/or ideal_customer_profile.
+- If the user says wrong channels or wants to add/change channels → update search_channels only.
+- You may ask AT MOST ONE short clarifying question — only if genuinely needed. Then output the config.
+- Make search queries SPECIFIC — include geography, industry terms, company types, trigger events. Bad: "FMCG expansion MY". Good: "FMCG distributor warehouse clearance Malaysia 2024".
+- Available channels: "linkedin", "reddit", "instagram", "facebook", "news", "google". Order by priority (most likely to yield signal first).
+
+When ready, output ONLY this exact block (nothing before or after):
+
+<CONFIG>
+{{
+  "agent_name": "{current_cfg.get('agent_name', '')}",
+  "sender_name": "{current_cfg.get('sender_name', '')}",
+  "sender_company": "{current_cfg.get('sender_company', '')}",
+  "sender_description": "{current_cfg.get('sender_description', '')}",
+  "qualifier_context": "{qualifier_context_esc}",
+  "ideal_customer_profile": "{icp_esc}",
+  "what_we_offer": "{what_we_offer_esc}",
+  "strong_signals": {current_strong},
+  "weak_signals": {current_weak},
+  "result_schema": {{
+    "lead_name_field": "company_name",
+    "categories": {current_cats},
+    "geographies": {current_geos},
+    "signal_types": {current_sigs}
+  }},
+  "score_thresholds": {current_thresholds},
+  "search_queries": {current_queries_json},
+  "search_channels": {current_channels},
+  "max_results_per_query": {current_cfg.get('max_results_per_query', 5)},
+  "search_geo": "{current_cfg.get('search_geo', '')}"
+}}
+</CONFIG>
+
+The values above are the DEFAULTS. Only edit the fields the user's feedback requires. Everything else stays exactly as shown.
+"""
+
+    history: list[dict] = []
+
+    # Wait for the user's first message — no LLM round-trip on connect
+    await ws.send_text(json.dumps({
+        "type": "agent",
+        "content": "Got it — what's wrong with the current leads? I'll make targeted corrections while keeping everything that's working.",
+    }))
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            user_text = msg.get("content", "").strip()
+            if not user_text:
+                continue
+
+            history.append({"role": "user", "content": user_text})
+
+            try:
+                h = list(history)  # snapshot to avoid closure mutation issues
+                reply = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, lambda: ollama_chat(h, SYSTEM)
+                    ),
+                    timeout=180,
+                )
+            except asyncio.TimeoutError:
+                await ws.send_text(json.dumps({
+                    "type": "agent",
+                    "content": "The model took too long to respond. Please try again with a shorter message.",
+                }))
+                continue
+            except Exception as e:
+                await ws.send_text(json.dumps({
+                    "type": "agent",
+                    "content": f"Error calling the model: {e}. Is Ollama running?",
+                }))
+                continue
+
+            history.append({"role": "assistant", "content": reply})
+
+            if "<CONFIG>" in reply and "</CONFIG>" in reply:
+                raw_cfg = reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    new_cfg = json.loads(raw_cfg)
+                    with open(cfg_path, "w") as f:
+                        json.dump(new_cfg, f, indent=2)
+                    await ws.send_text(json.dumps({"type": "config_ready", "content": new_cfg}))
+                except json.JSONDecodeError as e:
+                    await ws.send_text(json.dumps({
+                        "type": "agent",
+                        "content": f"I had trouble parsing the revised config ({e}). Please try rephrasing your feedback.",
+                    }))
+            else:
+                await ws.send_text(json.dumps({"type": "agent", "content": reply}))
+
+    except WebSocketDisconnect:
+        pass
 
 
 # ─── WebSocket Chat ─────────────────────────────────────────────────────────────
@@ -537,6 +1457,21 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                     else:
                         col_loc = df.columns.get_loc(field)
                         df.iloc[row_idx, col_loc] = value
+                    _save_output(session.file_id, session.normalized_df)
+                    await _send_preview(websocket, session.file_id, session.normalized_df)
+                continue
+
+            # ── Delete row ─────────────────────────────────────────────────────
+            elif msg_type == "delete_row":
+                row_idx = content.get("row_index")
+                if (
+                    session.normalized_df is not None
+                    and isinstance(row_idx, int)
+                    and 0 <= row_idx < len(session.normalized_df)
+                ):
+                    session.normalized_df = session.normalized_df.drop(
+                        index=session.normalized_df.index[row_idx]
+                    ).reset_index(drop=True)
                     _save_output(session.file_id, session.normalized_df)
                     await _send_preview(websocket, session.file_id, session.normalized_df)
                 continue
