@@ -1,0 +1,116 @@
+{
+  "agent_name": "Anoop Sasidharan",
+  "sender_name": "Anoop Sasidharan",
+  "sender_company": "Pollen",
+  "sender_description": "Director, Marketplace and CS | B2B liquidation marketplace for FMCG products in SEA",
+  "qualifier_context": "You are a lead qualification specialist for Pollen, a B2B marketplace in Southeast Asia where FMCG brands and distributors sell excess, slow-moving, near-expiry, or discontinued inventory to buyers (wholesalers, discount retailers, exporters). A good lead is a company that either: (A) likely has excess or unwanted FMCG stock to offload \u2014 e.g. a brand restructuring, a distributor clearing warehouse space, a company exiting a market; or (B) actively buys discounted or surplus FMCG goods \u2014 e.g. discount retailers, closeout buyers, wholesale traders. The focus is on personal care and beauty products, with a strong emphasis on skincare, haircare, and cosmetic products. The geographies are Malaysia, Indonesia, Thailand, Philippines, and India.",
+  "ideal_customer_profile": "FMCG brands or distributors in SEA (MY, ID, TH, PH, IN) with: excess stock of skincare, haircare, and cosmetic products, slow-moving SKUs, near-expiry products, overstocked warehouses, market exits, portfolio rationalisations, factory overruns, or cancelled orders. Also: beauty wholesale traders, discount retailers, or closeout buyers actively sourcing discounted or surplus FMCG personal care products.",
+  "what_we_offer": "Pollen connects sellers of excess FMCG inventory with verified buyers across SEA. Sellers offload surplus stock fast without brand damage; buyers get quality FMCG products at 30-70% below wholesale. Pollen handles the deal, logistics coordination, and buyer matching.",
+  "strong_signals": [
+    "FMCG brand announcing product discontinuation, SKU rationalisation, or portfolio pruning",
+    "Distributor or importer clearing warehouse or exiting a product category",
+    "Company doing a market exit from MY, ID, TH, or PH",
+    "Factory overrun, cancelled order, or excess production announcement",
+    "Near-expiry or short-shelf-life FMCG inventory being sold off",
+    "Discount retailer, closeout buyer, or wholesale trader sourcing cheap FMCG stock",
+    "Liquidation sale, clearance event, or flash sale of FMCG goods",
+    "FMCG company undergoing restructuring, M&A, or bankruptcy proceedings",
+    "Brand pulling out of a distribution channel or switching distributors"
+  ],
+  "weak_signals": [
+    "Generic FMCG industry news with no inventory signal",
+    "Job posting for a marketing or brand role (no operational signal)",
+    "Product launch or new SKU introduction (opposite of excess)",
+    "Retail store opening or expansion (buyer side, not seller side, unless they are a discount/closeout chain)",
+    "Annual report or financial results with no specific inventory mention",
+    "Trade show participation or sponsorship",
+    "Consumer-facing press about a product (not a B2B signal)",
+    "Non-SEA geography with no SEA operations"
+  ],
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "FMCG Brand",
+      "Distributor / Importer",
+      "Wholesale Trader",
+      "Discount Retailer",
+      "Closeout Buyer",
+      "Logistics / 3PL"
+    ],
+    "geographies": [
+      "MY",
+      "ID",
+      "TH",
+      "PH",
+      "IN",
+      "SG"
+    ],
+    "signal_types": [
+      "excess_inventory",
+      "product_discontinuation",
+      "market_exit",
+      "warehouse_clearance",
+      "factory_overrun",
+      "near_expiry_stock",
+      "restructuring",
+      "discount_buyer",
+      "distributor_change"
+    ]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "excess_inventory",
+      "queries": [
+        "Skincare liquidation Malaysia 2024",
+        "Haircare surplus stock clearance Indonesia distributor",
+        "Cosmetic excess inventory Thailand warehouse",
+        "FMCG skincare surplus stock SEA",
+        "FMCG haircare excess inventory Philippines importer"
+      ]
+    },
+    {
+      "signal": "product_discontinuation",
+      "queries": [
+        "Beauty brand discontinue product Malaysia",
+        "Cosmetic company discontinue product line Indonesia",
+        "Skincare product line pruning SEA distributor",
+        "FMCG personal care portfolio pruning TH distributor"
+      ]
+    },
+    {
+      "signal": "market_exit",
+      "queries": [
+        "Skincare brand exit Malaysia market",
+        "Beauty company exit Indonesia market 2024",
+        "FMCG cosmetics brand exit Thailand market distributor",
+        "FMCG personal care brand exit Philippines market"
+      ]
+    },
+    {
+      "signal": "warehouse_clearance",
+      "queries": [
+        "Skincare distributor warehouse clearance Malaysia",
+        "Haircare clearance sale Indonesia",
+        "FMCG cosmetics clearance sale Thailand",
+        "FMCG skincare clearance sale SEA"
+      ]
+    },
+    {
+      "signal": "discount_buyer",
+      "queries": [
+        "Beauty wholesaler buyer Malaysia",
+        "Cosmetic closeout buyer Indonesia",
+        "FMCG personal care surplus stock buyer Thailand Philippines",
+        "Skincare liquidation buyer SEA",
+        "FMCG haircare surplus stock buyer India"
+      ]
+    }
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "MY"
+}

@@ -1,0 +1,74 @@
+{
+  "_comment": "BD Agent config. This instance is configured for Pollen. To use for a different business, update all fields below.",
+
+  "agent_name": "Pollen BD Agent",
+  "sender_name": "Anoop",
+  "sender_company": "Pollen",
+  "sender_description": "B2B liquidation marketplace in SEA",
+
+  "qualifier_context": "You are a BD analyst for Pollen, a B2B FMCG liquidation marketplace. Pollen helps brands liquidate excess/slow-moving inventory to vetted buyers.",
+
+  "strong_signals": [
+    "Running heavy clearance sales, steep discounts (>40%), or end-of-line sales",
+    "News about overstock, write-offs, inventory build-up, or cash flow pressure",
+    "Recently funded FMCG startup (raised capital fast, inventory risk is high)",
+    "Brand doing D2C + offline and struggling with returns or unsold stock",
+    "SKU rationalisation, discontinuing product lines, warehouse liquidation"
+  ],
+
+  "weak_signals": [
+    "Seasonal sale (routine, not a signal of stress)",
+    "Grocery chains or pure distributors (not brand sellers)",
+    "Non-FMCG categories (electronics, furniture, etc.)",
+    "Already listed on major liquidation platforms"
+  ],
+
+  "result_schema": {
+    "lead_name_field": "brand_name",
+    "categories": ["beauty", "food", "personal_care", "home", "fashion", "other"],
+    "geographies": ["India", "Indonesia", "Malaysia", "Thailand", "Philippines", "Singapore", "other"],
+    "signal_types": ["clearance", "overstock_news", "funded_brand"]
+  },
+
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+
+  "search_queries": [
+    {
+      "signal": "clearance",
+      "queries": [
+        "FMCG brand clearance sale India 2024 excess stock",
+        "D2C brand warehouse clearance India beauty personal care",
+        "FMCG brand stock liquidation sale India Indonesia 2024",
+        "beauty brand excess inventory clearance India",
+        "personal care brand end of line sale Southeast Asia"
+      ]
+    },
+    {
+      "signal": "overstock_news",
+      "queries": [
+        "FMCG brand overstock inventory write off India 2024",
+        "D2C brand excess inventory problem India",
+        "FMCG startup inventory glut write-down India Southeast Asia",
+        "consumer goods brand slow moving inventory India",
+        "FMCG company inventory management challenges India 2024"
+      ]
+    },
+    {
+      "signal": "funded_brand",
+      "queries": [
+        "FMCG D2C brand Series A funding India 2024",
+        "beauty personal care brand raised funding India 2024",
+        "consumer goods startup raised capital India fast growing 2024",
+        "D2C brand Series B India food beverage 2024",
+        "FMCG startup funding round India Indonesia Malaysia 2024"
+      ]
+    }
+  ],
+
+  "max_results_per_query": 5,
+  "search_geo": "in"
+}

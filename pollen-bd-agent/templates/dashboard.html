@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pollen BD Agent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2a2f45;
+    --text: #e4e6f0;
+    --muted: #7a7f99;
+    --hot: #f97316;
+    --warm: #facc15;
+    --cold: #6b7280;
+    --green: #22c55e;
+    --blue: #3b82f6;
+    --purple: #8b5cf6;
+    --radius: 10px;
+    --mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; font-size: 14px; line-height: 1.6; }
+
+  /* Layout */
+  .layout { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 16px; display: flex; flex-direction: column; gap: 8px; }
+  .main { padding: 24px; overflow-y: auto; }
+
+  /* Sidebar */
+  .logo { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; }
+  .logo span { color: var(--hot); }
+  .nav-item { padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--muted); display: flex; align-items: center; gap: 8px; transition: all 0.15s; }
+  .nav-item:hover, .nav-item.active { background: var(--surface2); color: var(--text); }
+  .nav-badge { margin-left: auto; background: var(--hot); color: #fff; font-size: 11px; padding: 1px 7px; border-radius: 99px; font-weight: 600; }
+  .nav-section { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin: 12px 4px 4px; }
+
+  /* Stats */
+  .stats-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; }
+  .stat-card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+  .stat-card.hot .value { color: var(--hot); }
+  .stat-card.new .value { color: var(--blue); }
+
+  /* Filters */
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+  .filter-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 99px; background: none; color: var(--muted); cursor: pointer; font-size: 13px; transition: all 0.15s; }
+  .filter-btn:hover { border-color: var(--text); color: var(--text); }
+  .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .filter-hot.active { background: var(--hot); border-color: var(--hot); }
+  .filter-warm.active { background: var(--warm); border-color: var(--warm); color: #000; }
+
+  /* Leads table */
+  .leads-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .leads-table { width: 100%; border-collapse: collapse; }
+  .leads-table th { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--border); background: var(--surface2); white-space: nowrap; font-weight: 600; }
+  .leads-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  .leads-table tbody tr { cursor: pointer; transition: background 0.12s; }
+  .leads-table tbody tr:hover { background: var(--surface2); }
+  .leads-table tbody tr:last-child td { border-bottom: none; }
+  .leads-table .brand-cell { font-weight: 600; font-size: 14px; }
+  .leads-table .reason-cell { color: var(--muted); font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; display: inline-block; }
+  .badge-hot { background: #2d1a0e; color: var(--hot); }
+  .badge-warm { background: #2d2a0e; color: var(--warm); }
+  .badge-cold { background: #1e2030; color: var(--cold); }
+  .badge-category { background: var(--surface2); color: var(--muted); }
+  .badge-signal { background: #1a2240; color: var(--blue); }
+  .lead-badges { display: flex; gap: 6px; flex-wrap: wrap; }
+  .score-ring { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .score-hot { background: #2d1a0e; color: var(--hot); }
+  .score-warm { background: #2d2a0e; color: var(--warm); }
+  .score-cold { background: #1e2030; color: var(--cold); }
+  .btn { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 11px; font-weight: 500; transition: opacity 0.15s; white-space: nowrap; }
+  .btn:hover { opacity: 0.85; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-ghost { background: var(--surface2); color: var(--text); }
+  .btn-success { background: #14532d; color: var(--green); }
+  .actions-cell { display: flex; gap: 6px; }
+
+  /* Detail panel */
+  .detail-panel { display: none; position: fixed; top: 0; right: 0; width: 520px; height: 100vh; background: var(--surface); border-left: 1px solid var(--border); z-index: 100; overflow-y: auto; padding: 24px; }
+  .detail-panel.open { display: block; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+  .panel-close { background: var(--surface2); border: none; color: var(--text); width: 32px; height: 32px; border-radius: 8px; cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+  .email-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-top: 12px; font-family: var(--mono); font-size: 12px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+  .email-subject { font-weight: 700; font-family: var(--mono); margin-bottom: 8px; color: var(--blue); font-size: 12px; }
+  .copy-btn { margin-top: 8px; padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; color: var(--text); font-size: 12px; }
+  .copy-btn:hover { background: var(--border); }
+  .section-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin: 18px 0 8px; }
+  .notes-input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 72px; font-family: inherit; }
+  .status-select { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--text); padding: 8px 12px; font-size: 13px; width: 100%; }
+  .source-link { color: var(--blue); text-decoration: none; font-size: 12px; word-break: break-all; }
+  .source-link:hover { text-decoration: underline; }
+
+  /* Log panel */
+  .log-box { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 16px; font-family: var(--mono); font-size: 12px; line-height: 1.7; white-space: pre-wrap; max-height: 400px; overflow-y: auto; color: #a0a8c0; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 60px 20px; color: var(--muted); }
+  .empty h3 { font-size: 18px; margin-bottom: 8px; color: var(--text); }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #22c55e; color: #fff; padding: 10px 20px; border-radius: 99px; font-size: 13px; font-weight: 600; display: none; z-index: 999; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="logo">🌱 <span>Pollen</span> BD</div>
+    <div class="nav-section">Pipeline</div>
+    <div class="nav-item active" onclick="setView('leads')">📋 All Leads <span id="nav-badge" class="nav-badge">0</span></div>
+    <div class="nav-item" onclick="setView('hot')">🔥 Hot Leads</div>
+    <div class="nav-item" onclick="setView('new')">✨ New Today</div>
+    <div class="nav-item" onclick="setView('contacted')">📨 Contacted</div>
+    <div class="nav-section">System</div>
+    <div class="nav-item" onclick="setView('log')">📝 Agent Log</div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+    <!-- Stats -->
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="label">Total leads</div><div class="value" id="stat-total">—</div></div>
+      <div class="stat-card new"><div class="label">New</div><div class="value" id="stat-new">—</div></div>
+      <div class="stat-card hot"><div class="label">Hot</div><div class="value" id="stat-hot">—</div></div>
+      <div class="stat-card"><div class="label">Reviewed</div><div class="value" id="stat-reviewed">—</div></div>
+      <div class="stat-card"><div class="label">Contacted</div><div class="value" id="stat-contacted">—</div></div>
+    </div>
+
+    <!-- Leads view -->
+    <div id="view-leads">
+      <div class="filters">
+        <button class="filter-btn active" onclick="applyFilter('','')" id="f-all">All</button>
+        <button class="filter-btn filter-hot" onclick="applyFilter('priority','hot')" id="f-hot">🔥 Hot</button>
+        <button class="filter-btn filter-warm" onclick="applyFilter('priority','warm')" id="f-warm">☀️ Warm</button>
+        <button class="filter-btn" onclick="applyFilter('status','new')" id="f-new">New only</button>
+        <button class="filter-btn" onclick="applyFilter('status','reviewed')" id="f-reviewed">Reviewed</button>
+        <button class="filter-btn" onclick="applyFilter('status','contacted')" id="f-contacted">Contacted</button>
+      </div>
+      <div id="leads-grid"></div>
+    </div>
+
+    <!-- Log view -->
+    <div id="view-log" style="display:none">
+      <h2 style="margin-bottom:16px;font-size:16px;">Agent log</h2>
+      <div class="log-box" id="log-box">Loading...</div>
+      <button class="btn btn-ghost" style="margin-top:12px" onclick="loadLog()">Refresh</button>
+    </div>
+  </main>
+</div>
+
+<!-- Detail Panel -->
+<div class="detail-panel" id="detail-panel">
+  <div class="panel-header">
+    <span style="font-size:16px;font-weight:600" id="dp-brand">Brand</span>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+
+  <div class="lead-badges" id="dp-badges"></div>
+
+  <div class="section-label">Why it's a fit</div>
+  <p id="dp-reason" style="font-size:13px;color:var(--muted);line-height:1.6"></p>
+
+  <div class="section-label">Source</div>
+  <a id="dp-source" class="source-link" href="#" target="_blank">—</a>
+
+  <div class="section-label">Draft outreach email</div>
+  <div class="email-subject" id="dp-subject"></div>
+  <div class="email-box" id="dp-email"></div>
+  <button class="copy-btn" onclick="copyEmail()">Copy email</button>
+
+  <div class="section-label">Status</div>
+  <select class="status-select" id="dp-status" onchange="updateLead()">
+    <option value="new">New</option>
+    <option value="reviewed">Reviewed</option>
+    <option value="contacted">Contacted</option>
+    <option value="archived">Archived</option>
+  </select>
+
+  <div class="section-label">Notes</div>
+  <textarea class="notes-input" id="dp-notes" placeholder="Add internal notes..." oninput="scheduleUpdate()"></textarea>
+</div>
+
+<div class="toast" id="toast">Saved ✓</div>
+
+<script>
+let allLeads = [];
+let currentFilter = { field: '', value: '' };
+let currentLead = null;
+let saveTimer = null;
+
+// ── Views ─────────────────────────────────────────────────────────────────────
+function setView(view) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  event.target.closest('.nav-item').classList.add('active');
+
+  document.getElementById('view-leads').style.display = view === 'log' ? 'none' : 'block';
+  document.getElementById('view-log').style.display = view === 'log' ? 'block' : 'none';
+
+  if (view === 'log') { loadLog(); return; }
+  if (view === 'hot') applyFilter('priority', 'hot');
+  else if (view === 'new') applyFilter('status', 'new');
+  else if (view === 'contacted') applyFilter('status', 'contacted');
+  else applyFilter('', '');
+}
+
+// ── Filters ────────────────────────────────────────────────────────────────────
+function applyFilter(field, value) {
+  currentFilter = { field, value };
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  const id = value ? `f-${value}` : 'f-all';
+  const btn = document.getElementById(id);
+  if (btn) btn.classList.add('active');
+  renderLeads();
+}
+
+// ── Data ──────────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const r = await fetch('/api/stats');
+  const s = await r.json();
+  document.getElementById('stat-total').textContent = s.total;
+  document.getElementById('stat-new').textContent = s.new;
+  document.getElementById('stat-hot').textContent = s.hot;
+  document.getElementById('stat-reviewed').textContent = s.reviewed;
+  document.getElementById('stat-contacted').textContent = s.contacted;
+  document.getElementById('nav-badge').textContent = s.new;
+}
+
+async function loadLeads() {
+  const r = await fetch('/api/leads');
+  allLeads = await r.json();
+  renderLeads();
+}
+
+function renderLeads() {
+  const { field, value } = currentFilter;
+  let leads = [...allLeads];
+  if (field && value) leads = leads.filter(l => l[field] === value);
+
+  const grid = document.getElementById('leads-grid');
+  if (!leads.length) {
+    grid.innerHTML = `<div class="empty"><h3>No leads yet</h3><p>Run the agent to start finding leads.</p></div>`;
+    return;
+  }
+
+  grid.innerHTML = `
+    <div class="leads-table-wrap">
+      <table class="leads-table">
+        <thead>
+          <tr>
+            <th>Score</th>
+            <th>Brand</th>
+            <th>Country</th>
+            <th>Found</th>
+            <th>Priority</th>
+            <th>Category</th>
+            <th>Signal</th>
+            <th>Status</th>
+            <th>Reason</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${leads.map(l => `
+            <tr onclick="openLead('${l.id}')">
+              <td><div class="score-ring score-${l.priority}">${l.fit_score}</div></td>
+              <td class="brand-cell">${l.brand_name || 'Unknown'}</td>
+              <td>${l.country || '—'}</td>
+              <td style="white-space:nowrap">${fmtDate(l.found_at)}</td>
+              <td><span class="badge badge-${l.priority}">${l.priority}</span></td>
+              <td><span class="badge badge-category">${l.category || '—'}</span></td>
+              <td><span class="badge badge-signal">${(l.signal_type||'').replace('_',' ')}</span></td>
+              <td><span class="badge badge-category">${l.status || 'new'}</span></td>
+              <td class="reason-cell" title="${(l.fit_reason||'').replace(/"/g,'&quot;')}">${l.fit_reason || '—'}</td>
+              <td>
+                <div class="actions-cell">
+                  <button class="btn btn-primary" onclick="event.stopPropagation();openLead('${l.id}')">View</button>
+                  <button class="btn btn-success" onclick="event.stopPropagation();markContacted('${l.id}')">Contacted</button>
+                  <button class="btn btn-ghost" onclick="event.stopPropagation();window.open('${l.source_url||'#'}','_blank')">Source ↗</button>
+                </div>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Lead detail panel ─────────────────────────────────────────────────────────
+function openLead(id) {
+  const l = allLeads.find(x => x.id === id);
+  if (!l) return;
+  currentLead = l;
+
+  document.getElementById('dp-brand').textContent = l.brand_name || 'Unknown brand';
+  document.getElementById('dp-reason').textContent = l.fit_reason || '—';
+  document.getElementById('dp-source').textContent = l.source_url || '—';
+  document.getElementById('dp-source').href = l.source_url || '#';
+  document.getElementById('dp-subject').textContent = 'Subject: ' + (l.outreach_email?.subject || '—');
+  document.getElementById('dp-email').textContent = l.outreach_email?.body || '—';
+  document.getElementById('dp-status').value = l.status || 'new';
+  document.getElementById('dp-notes').value = l.notes || '';
+
+  document.getElementById('dp-badges').innerHTML = `
+    <span class="badge badge-${l.priority}">${l.priority} · ${l.fit_score}/10</span>
+    <span class="badge badge-category">${l.category || '—'}</span>
+    <span class="badge badge-signal">${(l.signal_type||'').replace('_',' ')}</span>
+    <span class="badge badge-category">${l.country || '—'}</span>
+  `;
+
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closePanel() {
+  document.getElementById('detail-panel').classList.remove('open');
+  currentLead = null;
+}
+
+async function updateLead() {
+  if (!currentLead) return;
+  const status = document.getElementById('dp-status').value;
+  const notes  = document.getElementById('dp-notes').value;
+  await fetch(`/api/leads/${currentLead.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status, notes })
+  });
+  // Update local
+  const idx = allLeads.findIndex(l => l.id === currentLead.id);
+  if (idx !== -1) { allLeads[idx].status = status; allLeads[idx].notes = notes; }
+  showToast('Saved ✓');
+  await loadStats();
+  renderLeads();
+}
+
+function scheduleUpdate() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(updateLead, 1200);
+}
+
+async function markContacted(id) {
+  await fetch(`/api/leads/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'contacted' })
+  });
+  const idx = allLeads.findIndex(l => l.id === id);
+  if (idx !== -1) allLeads[idx].status = 'contacted';
+  showToast('Marked as contacted ✓');
+  await loadStats();
+  renderLeads();
+}
+
+function copyEmail() {
+  const subject = document.getElementById('dp-subject').textContent.replace('Subject: ', '');
+  const body    = document.getElementById('dp-email').textContent;
+  navigator.clipboard.writeText(`Subject: ${subject}\n\n${body}`).then(() => showToast('Email copied ✓'));
+}
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+async function loadLog() {
+  const r = await fetch('/api/log');
+  const d = await r.json();
+  const box = document.getElementById('log-box');
+  box.textContent = d.log;
+  box.scrollTop = box.scrollHeight;
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(() => t.style.display = 'none', 2000);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadStats();
+loadLeads();
+setInterval(() => { loadStats(); loadLeads(); }, 30000); // Auto-refresh every 30s
+</script>
+</body>
+</html>

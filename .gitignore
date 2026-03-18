@@ -14,4 +14,9 @@ backend/*.log
 backend/.venv/
 backend/context_memory.json
 
+# Pollen BD Agent — user-specific files, never committed
+pollen-bd-agent/config.json
+pollen-bd-agent/data/
+pollen-bd-agent/.env
+
 *.log

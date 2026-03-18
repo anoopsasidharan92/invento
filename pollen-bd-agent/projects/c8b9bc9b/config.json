@@ -1,0 +1,63 @@
+{
+  "agent_name": "TwinThreads Studio",
+  "sender_name": "TwinThreads Studio Team",
+  "sender_company": "TwinThreads Studio",
+  "sender_description": "Fashion-focused brand sourcing traditional Indian textiles, specializing in Sungudi cotton sarees",
+  "qualifier_context": "We help sellers liquidate inventory faster and access new buyer markets. We focus on authentic, high-quality sourcing with scalable demand. We're particularly interested in Sungudi cotton sarees from manufacturers, wholesalers, and exporters with ready inventory or scalable production capacity.",
+  "ideal_customer_profile": "Sungudi cotton saree suppliers from India, especially from Tamil Nadu clusters like Madurai, Salem, and Erode. We're looking for companies with ready inventory, scalable production capacity, and a focus on Sungudi cotton sarees.",
+  "what_we_offer": "Consistent demand, structured buying, and long-term partnerships for Sungudi cotton sarees. We help sellers access new buyer markets and liquidate inventory faster.",
+  "strong_signals": [
+    "Sellers offering Sungudi cotton only",
+    "Exporters with cancelled or deferred Sungudi cotton orders"
+  ],
+  "weak_signals": [
+    "Generic saree sellers",
+    "Resellers without inventory control",
+    "Made-to-order only manufacturers",
+    "Premium or high-margin positioning"
+  ],
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "Textile manufacturer",
+      "Wholesaler",
+      "Exporter"
+    ],
+    "geographies": [
+      "India",
+      "Export hubs like Surat, Mumbai, and Jaipur"
+    ],
+    "signal_types": [
+      "Sungudi_cotton_wholesaler",
+      "Sungudi_exporter"
+    ]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "Sungudi_cotton_wholesaler",
+      "queries": [
+        "Sungudi cotton wholesalers",
+        "Sungudi cotton bulk supplier"
+      ]
+    },
+    {
+      "signal": "Sungudi_exporter",
+      "queries": [
+        "Sungudi cotton export houses",
+        "Exporting Tamil Nadu Sungudi cotton"
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news",
+    "google"
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "in"
+}
