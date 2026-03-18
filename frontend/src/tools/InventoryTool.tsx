@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Send, Package, Trash2 } from "lucide-react";
+import { Send, Package, Trash2, Download } from "lucide-react";
 import FileUpload from "../components/FileUpload";
 import ChatWindow, { ChatMessage, CellEditFn, ConfirmMappingFn } from "../components/ChatWindow";
 import MappingCard from "../components/MappingCard";
@@ -37,6 +37,7 @@ export default function InventoryTool() {
   const [input, setInput] = useState("");
   const [fileUploaded, setFileUploaded] = useState(false);
   const [doneFileId, setDoneFileId] = useState<string | null>(null);
+  const [previewFileId, setPreviewFileId] = useState<string | null>(null);
   const [enrichmentNeeded, setEnrichmentNeeded] = useState(false);
   const [progress, setProgress] = useState<ProgressContent | null>(null);
   const [loadingPhraseIdx, setLoadingPhraseIdx] = useState(0);
@@ -62,6 +63,7 @@ export default function InventoryTool() {
         case "preview":
           setThinking(false);
           pushMessage({ id: newId(), role: "agent", previewContent: msg.content as PreviewContent });
+          setPreviewFileId((msg.content as PreviewContent).file_id);
           break;
         case "done":
           setThinking(false);
@@ -111,6 +113,7 @@ export default function InventoryTool() {
   const handleFileUploaded = useCallback(
     (response: UploadResponse, selectedSheet: string) => {
       setFileUploaded(true);
+      setPreviewFileId(response.file_id);
       setEnrichmentNeeded(false);
       setThinking(true);
       pushMessage({
@@ -149,12 +152,17 @@ export default function InventoryTool() {
     clientRef.current?.updateCell(rowIndex, field, value, applyAll);
   }, []);
 
+  const handleDeleteRow = useCallback((rowIndex: number) => {
+    clientRef.current?.deleteRow(rowIndex);
+  }, []);
+
   const handleClearChat = useCallback(() => {
     setMessages([]);
     setThinking(false);
     setInput("");
     setFileUploaded(false);
     setDoneFileId(null);
+    setPreviewFileId(null);
     setEnrichmentNeeded(false);
     setProgress(null);
     const client = clientRef.current;
@@ -301,21 +309,32 @@ export default function InventoryTool() {
                 <Send className="w-3.5 h-3.5 text-white -ml-0.5" />
               </button>
             </div>
-            {doneFileId && (
-              <div className="px-4 py-3 border-t border-ui-border bg-gray-50/50 flex justify-center gap-6">
-                <a href={getDownloadUrl(doneFileId)} download className="text-xs font-medium text-ui-text hover:text-black hover:underline">
-                  Download Cleaned Data
+            {(previewFileId || doneFileId) && (
+              <div className="px-4 py-3 border-t border-ui-border bg-gray-50/50 flex items-center justify-center gap-3">
+                <a
+                  href={getDownloadUrl(doneFileId ?? previewFileId!)}
+                  download
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-semibold text-white bg-ui-text hover:bg-gray-800 shadow-sm transition-all"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  Download CSV
                 </a>
-                <a href={getCleanTemplateDownloadUrl(doneFileId)} download className="text-xs font-medium text-ui-text hover:text-black hover:underline">
-                  Download Template
-                </a>
+                {doneFileId && (
+                  <a
+                    href={getCleanTemplateDownloadUrl(doneFileId)}
+                    download
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-ui-text bg-white border border-ui-border hover:bg-gray-50 transition-all"
+                  >
+                    Download Template
+                  </a>
+                )}
               </div>
             )}
           </div>
           {fileUploaded && (
             <div className="max-w-3xl mx-auto flex items-center justify-center mt-3">
               <button
-                onClick={() => { setFileUploaded(false); setDoneFileId(null); }}
+                onClick={() => { setFileUploaded(false); setDoneFileId(null); setPreviewFileId(null); }}
                 className="text-xs text-ui-accent hover:text-ui-text transition-colors"
               >
                 Upload a different file
@@ -368,7 +387,7 @@ export default function InventoryTool() {
                 <p className="text-[12px] text-ui-accent leading-relaxed">
                   Preview the cleaned data. Click Category or Sub Category cells to edit.
                 </p>
-                <DataPreview preview={latestContextMsg.previewContent} onCellEdit={handleCellEdit} />
+                <DataPreview preview={latestContextMsg.previewContent} onCellEdit={handleCellEdit} onDeleteRow={handleDeleteRow} />
               </div>
             )}
           </div>
