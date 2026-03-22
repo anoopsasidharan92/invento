@@ -104,7 +104,7 @@ Turns any supplier inventory spreadsheet — regardless of layout, column names,
 6. **AI column mapping** — columns are matched to the standard schema with a confidence score; review and edit in the UI or by chatting
 7. **Apply mapping** — auto-calculates discount percentage and carton quantities where possible
 8. **Optional enrichment** — provide seller/brand/market context and the LLM fills missing `category` / `sub_category` using a built-in FMCG taxonomy
-9. **Export** — normalised CSV + full template CSV (all headers); session archived to SQLite
+9. **CSV download** — download the normalised data at any point after preview (cleaned data + full template CSV); session archived to SQLite
 
 ### Standard output fields
 
@@ -134,7 +134,7 @@ Turns any supplier inventory spreadsheet — regardless of layout, column names,
 4. Review the AI's proposed column mapping — correct any field via the dropdowns or by typing in the chat (e.g. *"use column D for the retail price"*)
 5. Click **Confirm Mapping** (or type *"yes"*)
 6. The normalised data appears as a paginated preview table
-7. Click **Download CSV** to save the output
+7. Click **Download CSV** to save the output (available as soon as the preview appears)
 
 ### Changing the AI model
 
@@ -170,9 +170,11 @@ A config-driven business development agent that continuously searches the web fo
 1. Open `http://localhost:5173` and select **BD Agent**
 2. Create a new project and complete the onboarding chat (describes target market, queries, geography)
 3. Click **Run Agent** — the agent runs as a background subprocess and streams status
-4. View leads as they arrive; filter by priority (hot / warm / cold)
+4. View leads as they arrive; filter by priority (hot / warm / cold), star important ones
 5. Use **Cleanup** to remove duplicates from accumulated runs
 6. Stop the agent at any time with **Stop Agent**
+7. **Download CSV** — export visible leads as a CSV file named after the project
+8. **Delete project** — hover over a project card and click the trash icon to permanently remove it
 
 ### Per-project config
 
@@ -253,7 +255,6 @@ Inventory Parsing/
 | FastAPI backend | 8000 |
 | React frontend (dev) | 5173 |
 | Ollama | 11434 |
-| Flask dashboard (legacy) | 5050 |
 
 ### Ollama model
 

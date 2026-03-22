@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshCw, Play, X, ExternalLink, Copy, Check, Send,
-  Star, Trash2, Eye, Plus, FolderOpen, ArrowLeft, Square, Download,
+  Star, Trash2, Plus, FolderOpen, ArrowLeft, Square, Download,
 } from "lucide-react";
 
 const API    = "http://localhost:8000";
@@ -100,11 +100,13 @@ function ProjectSelector({
   loading,
   onSelect,
   onRefresh,
+  onDelete,
 }: {
   projects: Project[];
   loading: boolean;
   onSelect: (project: Project) => void;
   onRefresh: () => void;
+  onDelete: (pid: string) => void;
 }) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName]   = useState("");
@@ -165,27 +167,43 @@ function ProjectSelector({
         ) : (
           <div className="grid grid-cols-2 gap-4 mb-6">
             {projects.map(p => (
-              <button
+              <div
                 key={p.id}
-                onClick={() => onSelect(p)}
-                className="bg-ui-card border border-ui-border hover:border-gray-400 rounded-xl p-5 text-left transition-colors group"
+                className="bg-ui-card border border-ui-border hover:border-gray-400 rounded-xl p-5 text-left transition-colors group relative"
               >
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <span className="font-semibold text-ui-text group-hover:text-white transition-colors truncate">
-                    {p.name}
-                  </span>
-                  <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                    p.configured
-                      ? "text-green-400 bg-green-950 border-green-800"
-                      : "text-yellow-400 bg-yellow-950 border-yellow-800"
-                  }`}>
-                    {p.configured ? "Ready" : "Setup needed"}
-                  </span>
-                </div>
-                <p className="text-xs text-ui-accent">
-                  Created {fmtDate(p.created_at)}
-                </p>
-              </button>
+                <button
+                  onClick={() => onSelect(p)}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-start justify-between gap-2 mb-3 pr-7">
+                    <span className="font-semibold text-ui-text group-hover:text-white transition-colors truncate">
+                      {p.name}
+                    </span>
+                    <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                      p.configured
+                        ? "text-green-400 bg-green-950 border-green-800"
+                        : "text-yellow-400 bg-yellow-950 border-yellow-800"
+                    }`}>
+                      {p.configured ? "Ready" : "Setup needed"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-ui-accent">
+                    Created {fmtDate(p.created_at)}
+                  </p>
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (confirm(`Delete project "${p.name}"? This cannot be undone.`)) {
+                      onDelete(p.id);
+                    }
+                  }}
+                  title="Delete project"
+                  className="absolute top-4 right-4 p-1.5 rounded-lg text-ui-accent hover:text-red-400 hover:bg-red-950/50 opacity-0 group-hover:opacity-100 transition-all"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -200,7 +218,7 @@ function ProjectSelector({
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => { if (e.key === "Enter") handleCreate(); if (e.key === "Escape") { setCreating(false); setNewName(""); }}}
-                placeholder="e.g. Pollen FMCG — India"
+                placeholder="e.g. FMCG — India"
                 className="flex-1 bg-ui-bg border border-ui-border rounded-xl px-4 py-2.5 text-sm text-ui-text placeholder:text-ui-accent"
               />
               <button
@@ -243,7 +261,231 @@ function ProjectSelector({
   );
 }
 
+// ── Manual Setup Form ─────────────────────────────────────────────────────────
+
+const CHANNELS = ["linkedin", "google", "news", "reddit", "instagram", "facebook"] as const;
+
+function ManualSetupForm({
+  projectId,
+  onDone,
+  onBack,
+}: {
+  projectId: string;
+  onDone: (cfg: AgentConfig) => void;
+  onBack: () => void;
+}) {
+  const [saving, setSaving] = useState(false);
+  const [err, setErr]       = useState("");
+  const [form, setForm]     = useState({
+    agent_name: "",
+    sender_name: "",
+    sender_company: "",
+    sender_description: "",
+    qualifier_context: "",
+    ideal_customer_profile: "",
+    what_we_offer: "",
+    strong_signals: "",
+    weak_signals: "",
+    search_queries_raw: "",
+    search_channels: ["linkedin", "google", "news"] as string[],
+    search_geo: "",
+    max_results_per_query: 5,
+    hot_min: 8,
+    warm_min: 5,
+    save_min: 4,
+  });
+
+  const set = (k: keyof typeof form, v: unknown) =>
+    setForm(prev => ({ ...prev, [k]: v }));
+
+  const toggleChannel = (ch: string) =>
+    set("search_channels", form.search_channels.includes(ch)
+      ? form.search_channels.filter(c => c !== ch)
+      : [...form.search_channels, ch]);
+
+  const handleSave = async () => {
+    if (!form.sender_company.trim() || !form.qualifier_context.trim()) {
+      setErr("Company name and qualifier context are required.");
+      return;
+    }
+    setSaving(true);
+    setErr("");
+
+    const strong = form.strong_signals.split("\n").map(s => s.trim()).filter(Boolean);
+    const weak   = form.weak_signals.split("\n").map(s => s.trim()).filter(Boolean);
+
+    // Parse raw query text: each non-empty line is a query under a single group
+    const rawQueries = form.search_queries_raw.split("\n").map(s => s.trim()).filter(Boolean);
+    const search_queries = rawQueries.length
+      ? [{ signal: "general", queries: rawQueries }]
+      : [{ signal: "general", queries: [`${form.sender_company} leads`, `${form.search_geo} ${form.sender_company}`] }];
+
+    const cfg = {
+      agent_name:            form.agent_name || `${form.sender_company} BD Agent`,
+      sender_name:           form.sender_name,
+      sender_company:        form.sender_company,
+      sender_description:    form.sender_description,
+      qualifier_context:     form.qualifier_context,
+      ideal_customer_profile: form.ideal_customer_profile,
+      what_we_offer:         form.what_we_offer,
+      strong_signals:        strong.length ? strong : ["Relevant to target market"],
+      weak_signals:          weak.length   ? weak   : ["Unrelated industries"],
+      result_schema: {
+        lead_name_field: "company_name",
+        categories: ["general"],
+        geographies: [form.search_geo || "global"],
+        signal_types: ["general_lead"],
+      },
+      score_thresholds: { hot_min: form.hot_min, warm_min: form.warm_min, save_min: form.save_min },
+      search_queries,
+      search_channels: form.search_channels.length ? form.search_channels : ["linkedin", "google"],
+      max_results_per_query: form.max_results_per_query,
+      search_geo: form.search_geo || "global",
+    };
+
+    try {
+      // Write config directly via the project config endpoint
+      const r = await fetch(`${API}/pollen/${projectId}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(cfg),
+      });
+      if (r.ok) {
+        onDone(cfg as AgentConfig);
+      } else {
+        const e = await r.json().catch(() => ({}));
+        setErr(e.detail ?? "Failed to save config. Please try again.");
+      }
+    } catch {
+      setErr("Network error. Is the backend running?");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = (label: string, key: keyof typeof form, placeholder = "", multiline = false) => (
+    <div>
+      <label className="block text-xs font-medium text-ui-accent mb-1">{label}</label>
+      {multiline ? (
+        <textarea
+          value={form[key] as string}
+          onChange={e => set(key, e.target.value)}
+          placeholder={placeholder}
+          rows={3}
+          className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent resize-y"
+        />
+      ) : (
+        <input
+          value={form[key] as string}
+          onChange={e => set(key, e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent"
+        />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="h-full overflow-y-auto px-6 py-8 max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={onBack} className="text-ui-accent hover:text-ui-text text-sm flex items-center gap-1 transition-colors">
+          ← Back to chat
+        </button>
+      </div>
+      <h1 className="text-xl font-semibold text-ui-text mb-1">Manual setup</h1>
+      <p className="text-sm text-ui-accent mb-6">Fill in your details directly — no chat required.</p>
+
+      <div className="space-y-4">
+        <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold">Identity</p>
+        {field("Agent name", "agent_name", "My BD Agent")}
+        {field("Sender name", "sender_name", "Jane Smith")}
+        {field("Sender company *", "sender_company", "Acme Ltd")}
+        {field("Sender description", "sender_description", "Head of BD | B2B SaaS for supply chain teams")}
+
+        <div className="border-t border-ui-border pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Targeting</p>
+          {field("Qualifier context *", "qualifier_context",
+            "We are Acme Ltd, a B2B SaaS company. A good lead is a mid-sized FMCG distributor expanding into new markets. We offer automated inventory reconciliation.", true)}
+          {field("Ideal customer profile", "ideal_customer_profile",
+            "Mid-sized distributor, 50-500 employees, operating in SEA or ME, experiencing rapid SKU growth.", true)}
+          {field("What we offer", "what_we_offer",
+            "We reduce manual reconciliation time by 80% — ideal for distributors onboarding new brands.", true)}
+        </div>
+
+        <div className="border-t border-ui-border pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Signals</p>
+          {field("Strong signals (one per line)", "strong_signals",
+            "Distributor expanding into new region\nCompany hiring logistics roles\nNew brand partnership announced", true)}
+          {field("Weak / ignore signals (one per line)", "weak_signals",
+            "Retail-only business\nConsumer-facing app\nFunded less than 1 year ago", true)}
+        </div>
+
+        <div className="border-t border-ui-border pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Search</p>
+          {field("Search queries (one per line)", "search_queries_raw",
+            "FMCG distributor expanding SEA 2025\nfood distributor new warehouse opening\nMalaysia FMCG logistics hiring", true)}
+          {field("Geography", "search_geo", "Malaysia, Southeast Asia")}
+
+          <div>
+            <label className="block text-xs font-medium text-ui-accent mb-2">Channels</label>
+            <div className="flex flex-wrap gap-2">
+              {CHANNELS.map(ch => (
+                <button
+                  key={ch}
+                  onClick={() => toggleChannel(ch)}
+                  className={`px-3 py-1 rounded-full text-xs border transition-colors ${
+                    form.search_channels.includes(ch)
+                      ? "bg-ui-text text-white border-ui-text"
+                      : "border-ui-border text-ui-accent hover:text-ui-text"
+                  }`}
+                >
+                  {ch}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs font-medium text-ui-accent mb-1">Results per query: {form.max_results_per_query}</label>
+            <input type="range" min={1} max={20} value={form.max_results_per_query}
+              onChange={e => set("max_results_per_query", Number(e.target.value))}
+              className="w-full" />
+          </div>
+        </div>
+
+        <div className="border-t border-ui-border pt-4">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Scoring thresholds</p>
+          <div className="grid grid-cols-3 gap-3">
+            {(["hot_min", "warm_min", "save_min"] as const).map(k => (
+              <div key={k}>
+                <label className="block text-xs text-ui-accent mb-1">
+                  {k === "hot_min" ? "Hot (min)" : k === "warm_min" ? "Warm (min)" : "Save (min)"}
+                </label>
+                <input type="number" min={1} max={10} value={form[k]}
+                  onChange={e => set(k, Number(e.target.value))}
+                  className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {err && <p className="text-xs text-red-400 bg-red-950 border border-red-800 rounded-lg px-3 py-2">{err}</p>}
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full py-3 rounded-xl bg-ui-text text-white font-semibold text-sm hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center justify-center gap-2"
+        >
+          {saving ? <><RefreshCw className="w-4 h-4 animate-spin" /> Saving…</> : "Save & go to dashboard →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Onboarding Chat ────────────────────────────────────────────────────────────
+
+const TOTAL_QUESTIONS = 6;
 
 function OnboardingChat({
   projectId,
@@ -252,36 +494,48 @@ function OnboardingChat({
   projectId: string;
   onDone: (cfg: AgentConfig) => void;
 }) {
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [input, setInput]       = useState("");
-  const [sending, setSending]   = useState(false);
-  const [connected, setConnected] = useState(false);
-  const wsRef   = useRef<WebSocket | null>(null);
+  const [messages, setMessages]     = useState<ChatMsg[]>([]);
+  const [input, setInput]           = useState("");
+  const [sending, setSending]       = useState(false);
+  const [connected, setConnected]   = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [showManual, setShowManual] = useState(false);
+  const [existingConfig, setExistingConfig] = useState<AgentConfig | null>(null);
+  const wsRef     = useRef<WebSocket | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const agentMsgCount = messages.filter(m => m.role === "agent").length;
+  const progress = Math.min(agentMsgCount / TOTAL_QUESTIONS, 1);
+  const canGenerate = agentMsgCount >= 1 && connected;
+
+  // Check if a config already exists for this project (escape hatch)
+  useEffect(() => {
+    fetch(`${API}/pollen/${projectId}/config`)
+      .then(r => r.ok ? r.json() : null)
+      .then(cfg => { if (cfg) setExistingConfig(cfg); })
+      .catch(() => {});
+  }, [projectId]);
 
   useEffect(() => {
     const ws = new WebSocket(`${WS_API}/pollen/ws/onboard?project_id=${projectId}`);
     wsRef.current = ws;
-
-    ws.onopen = () => setConnected(true);
-
+    ws.onopen  = () => setConnected(true);
+    ws.onclose = () => setConnected(false);
     ws.onmessage = (e) => {
       const msg = JSON.parse(e.data);
       if (msg.type === "config_ready") {
+        setGenerating(false);
         onDone(msg.content as AgentConfig);
       } else if (msg.type === "agent") {
         setMessages(prev => [...prev, { role: "agent", text: msg.content }]);
         setSending(false);
+        setGenerating(false);
       }
     };
-
-    ws.onclose = () => setConnected(false);
     return () => ws.close();
   }, [projectId, onDone]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const send = () => {
     const text = input.trim();
@@ -292,15 +546,67 @@ function OnboardingChat({
     setSending(true);
   };
 
+  const forceGenerate = () => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    setGenerating(true);
+    ws.send(JSON.stringify({ content: "[FORCE_GENERATE]", force: true }));
+  };
+
+  if (showManual) {
+    return <ManualSetupForm projectId={projectId} onDone={onDone} onBack={() => setShowManual(false)} />;
+  }
+
   return (
     <div className="h-full flex flex-col max-w-2xl mx-auto px-6 py-8">
-      <div className="mb-8">
-        <h1 className="text-xl font-semibold text-ui-text">Set up your BD Agent</h1>
-        <p className="text-sm text-ui-accent mt-1">
-          Answer a few questions and your agent will be configured for your business. This only happens once per project.
+      {/* Header */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-1">
+          <h1 className="text-xl font-semibold text-ui-text">Set up your BD Agent</h1>
+          <button
+            onClick={() => setShowManual(true)}
+            className="text-xs text-ui-accent hover:text-ui-text transition-colors underline underline-offset-2"
+          >
+            Set up manually
+          </button>
+        </div>
+        <p className="text-sm text-ui-accent">
+          Answer a few questions and your agent will be configured for your business.
         </p>
       </div>
 
+      {/* Progress bar */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[11px] text-ui-accent">
+            {agentMsgCount === 0 ? "Starting…" : `Question ${Math.min(agentMsgCount, TOTAL_QUESTIONS)} of ~${TOTAL_QUESTIONS}`}
+          </span>
+          {agentMsgCount > 0 && (
+            <span className="text-[11px] text-ui-accent">{Math.round(progress * 100)}% complete</span>
+          )}
+        </div>
+        <div className="h-1 bg-ui-card rounded-full overflow-hidden">
+          <div
+            className="h-full bg-green-500 rounded-full transition-all duration-500"
+            style={{ width: `${progress * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Existing config escape hatch */}
+      {existingConfig && (
+        <div className="mb-4 flex items-center justify-between gap-4 bg-green-950 border border-green-800 rounded-xl px-4 py-3">
+          <p className="text-sm text-green-300">A configuration already exists for this project.</p>
+          <button
+            onClick={() => onDone(existingConfig)}
+            className="flex-shrink-0 px-4 py-1.5 rounded-lg bg-green-700 hover:bg-green-600 text-white text-xs font-semibold transition-colors"
+          >
+            Go to Dashboard →
+          </button>
+        </div>
+      )}
+
+      {/* Chat messages */}
       <div className="flex-1 overflow-y-auto flex flex-col gap-4 mb-4">
         {!connected && messages.length === 0 && (
           <p className="text-sm text-ui-accent flex items-center gap-2">
@@ -318,33 +624,49 @@ function OnboardingChat({
             </div>
           </div>
         ))}
-        {sending && (
+        {(sending || generating) && (
           <div className="flex justify-start">
             <div className="bg-ui-card border border-ui-border rounded-2xl rounded-bl-sm px-4 py-3 text-sm text-ui-accent flex items-center gap-2">
-              <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Thinking…
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              {generating ? "Generating your config…" : "Thinking…"}
             </div>
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      <div className="flex gap-2">
+      {/* Input row */}
+      <div className="flex gap-2 mb-3">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === "Enter" && !e.shiftKey && send()}
           placeholder="Type your answer…"
-          disabled={!connected || sending}
+          disabled={!connected || sending || generating}
           className="flex-1 bg-ui-card border border-ui-border rounded-xl px-4 py-2.5 text-sm text-ui-text placeholder:text-ui-accent disabled:opacity-50"
         />
         <button
           onClick={send}
-          disabled={!connected || sending || !input.trim()}
+          disabled={!connected || sending || generating || !input.trim()}
           className="w-10 h-10 flex items-center justify-center rounded-xl bg-ui-text text-white disabled:opacity-40 transition-opacity"
         >
           <Send className="w-4 h-4" />
         </button>
       </div>
+
+      {/* Generate now button — always visible after first exchange */}
+      <button
+        onClick={forceGenerate}
+        disabled={!canGenerate || sending || generating}
+        className="w-full py-2.5 rounded-xl border border-green-700 text-green-400 text-sm font-medium hover:bg-green-950 disabled:opacity-30 transition-colors flex items-center justify-center gap-2"
+      >
+        {generating
+          ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Generating config…</>
+          : "Generate config now →"}
+      </button>
+      <p className="text-center text-[11px] text-ui-accent mt-1.5">
+        Can use this anytime — sensible defaults fill any gaps
+      </p>
     </div>
   );
 }
@@ -650,231 +972,614 @@ function CorrectLeadsChat({
   );
 }
 
+// ── Edit Config Panel ─────────────────────────────────────────────────────────
+
+type QueryGroupDraft = { signal: string; queries: string };   // queries = newline-separated
+
+function EditConfigPanel({
+  projectId,
+  context,
+  onDone,
+  onClose,
+}: {
+  projectId: string;
+  context: AgentContext;
+  onDone: (cfg: AgentConfig) => void;
+  onClose: () => void;
+}) {
+  const cfg = context.config;
+  const thr = context.score_thresholds ?? { hot_min: 8, warm_min: 5, save_min: 4 };
+
+  const [saving, setSaving]   = useState(false);
+  const [err, setErr]         = useState("");
+  const [form, setForm]       = useState({
+    agent_name:            cfg.agent_name ?? "",
+    sender_name:           cfg.sender_name ?? "",
+    sender_company:        cfg.sender_company ?? "",
+    sender_description:    cfg.sender_description ?? "",
+    qualifier_context:     cfg.qualifier_context ?? "",
+    ideal_customer_profile: cfg.ideal_customer_profile ?? "",
+    what_we_offer:         cfg.what_we_offer ?? "",
+    strong_signals:        (context.strong_signals ?? []).join("\n"),
+    weak_signals:          (context.weak_signals ?? []).join("\n"),
+    search_channels:       [...(context.search_channels ?? ["linkedin", "google"])],
+    search_geo:            context.search_geo ?? "",
+    max_results_per_query: context.max_results_per_query ?? 5,
+    hot_min:               thr.hot_min,
+    warm_min:              thr.warm_min,
+    save_min:              thr.save_min,
+  });
+
+  const [queryGroups, setQueryGroups] = useState<QueryGroupDraft[]>(() =>
+    (context.search_queries ?? []).length
+      ? context.search_queries.map(g => ({ signal: g.signal, queries: g.queries.join("\n") }))
+      : [{ signal: "general", queries: "" }]
+  );
+
+  const set = (k: keyof typeof form, v: unknown) =>
+    setForm(prev => ({ ...prev, [k]: v }));
+
+  const toggleChannel = (ch: string) =>
+    set("search_channels", (form.search_channels as string[]).includes(ch)
+      ? (form.search_channels as string[]).filter(c => c !== ch)
+      : [...(form.search_channels as string[]), ch]);
+
+  const updateGroup = (i: number, k: keyof QueryGroupDraft, v: string) =>
+    setQueryGroups(prev => prev.map((g, idx) => idx === i ? { ...g, [k]: v } : g));
+
+  const addGroup = () => setQueryGroups(prev => [...prev, { signal: "new_signal", queries: "" }]);
+  const removeGroup = (i: number) => setQueryGroups(prev => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = async () => {
+    if (!form.sender_company.trim()) { setErr("Company name is required."); return; }
+    setSaving(true); setErr("");
+
+    const search_queries = queryGroups
+      .map(g => ({
+        signal: g.signal.trim() || "general",
+        queries: g.queries.split("\n").map(s => s.trim()).filter(Boolean),
+      }))
+      .filter(g => g.queries.length > 0);
+
+    const payload = {
+      agent_name:            form.agent_name || `${form.sender_company} BD Agent`,
+      sender_name:           form.sender_name,
+      sender_company:        form.sender_company,
+      sender_description:    form.sender_description,
+      qualifier_context:     form.qualifier_context,
+      ideal_customer_profile: form.ideal_customer_profile,
+      what_we_offer:         form.what_we_offer,
+      strong_signals:        form.strong_signals.split("\n").map(s => s.trim()).filter(Boolean),
+      weak_signals:          form.weak_signals.split("\n").map(s => s.trim()).filter(Boolean),
+      search_queries:        search_queries.length ? search_queries : [{ signal: "general", queries: [`${form.sender_company} leads`] }],
+      search_channels:       (form.search_channels as string[]).length ? form.search_channels : ["linkedin", "google"],
+      search_geo:            form.search_geo,
+      max_results_per_query: form.max_results_per_query,
+      score_thresholds:      { hot_min: form.hot_min, warm_min: form.warm_min, save_min: form.save_min },
+      result_schema:         context.result_schema,
+      batch_size:            context.batch_size,
+    };
+
+    try {
+      const r = await fetch(`${API}/pollen/${projectId}/config`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (r.ok) {
+        onDone(payload as unknown as AgentConfig);
+        onClose();
+      } else {
+        const e = await r.json().catch(() => ({}));
+        setErr(e.detail ?? "Failed to save. Please try again.");
+      }
+    } catch {
+      setErr("Network error. Is the backend running?");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const Field = ({ label, k, placeholder = "", multiline = false }: {
+    label: string; k: keyof typeof form; placeholder?: string; multiline?: boolean;
+  }) => (
+    <div>
+      <label className="block text-xs font-medium text-ui-accent mb-1">{label}</label>
+      {multiline ? (
+        <textarea value={form[k] as string} onChange={e => set(k, e.target.value)}
+          placeholder={placeholder} rows={3}
+          className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent resize-y" />
+      ) : (
+        <input value={form[k] as string} onChange={e => set(k, e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent" />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="absolute inset-0 bg-ui-bg z-30 flex flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-ui-border flex-shrink-0">
+        <div>
+          <h2 className="font-semibold text-ui-text">Edit configuration</h2>
+          <p className="text-xs text-ui-accent mt-0.5">All changes apply to the next agent run.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handleSave} disabled={saving}
+            className="px-4 py-1.5 rounded-lg bg-ui-text text-white text-xs font-semibold hover:opacity-90 disabled:opacity-50 transition-opacity flex items-center gap-1.5">
+            {saving ? <><RefreshCw className="w-3.5 h-3.5 animate-spin" />Saving…</> : "Save changes"}
+          </button>
+          <button onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-lg bg-ui-card text-ui-accent hover:text-ui-text border border-ui-border transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto px-6 py-6">
+        <div className="max-w-3xl mx-auto space-y-8">
+
+          {err && <p className="text-xs text-red-400 bg-red-950 border border-red-800 rounded-lg px-3 py-2">{err}</p>}
+
+          {/* Identity */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Identity</p>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Agent name" k="agent_name" placeholder="My BD Agent" />
+              <Field label="Sender name" k="sender_name" placeholder="Jane Smith" />
+              <Field label="Company *" k="sender_company" placeholder="Acme Ltd" />
+              <Field label="Description / role" k="sender_description" placeholder="Head of BD | B2B SaaS" />
+            </div>
+          </section>
+
+          {/* Targeting */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Targeting</p>
+            <div className="space-y-3">
+              <Field label="Qualifier context" k="qualifier_context"
+                placeholder="Who you are, what a good lead looks like, what you offer." multiline />
+              <Field label="Ideal customer profile" k="ideal_customer_profile"
+                placeholder="Mid-sized FMCG distributor, 50-500 employees, expanding into new markets." multiline />
+              <Field label="What we offer" k="what_we_offer"
+                placeholder="We reduce reconciliation time by 80%. Ideal for fast-growing distributors." multiline />
+            </div>
+          </section>
+
+          {/* Signals */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Signals</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-green-400 mb-1">Strong signals — one per line</label>
+                <textarea value={form.strong_signals} onChange={e => set("strong_signals", e.target.value)}
+                  rows={5} placeholder={"Distributor expanding into new region\nCompany hiring logistics roles"}
+                  className="w-full bg-green-950/20 border border-green-900 rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent resize-y" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-red-400 mb-1">Weak signals — one per line</label>
+                <textarea value={form.weak_signals} onChange={e => set("weak_signals", e.target.value)}
+                  rows={5} placeholder={"Retail-only business\nConsumer-facing app"}
+                  className="w-full bg-red-950/20 border border-red-900 rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent resize-y" />
+              </div>
+            </div>
+          </section>
+
+          {/* Search queries */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold">Search queries</p>
+              <button onClick={addGroup}
+                className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors border border-blue-800 rounded-lg px-2.5 py-1">
+                <Plus className="w-3 h-3" /> Add signal group
+              </button>
+            </div>
+            <div className="space-y-3">
+              {queryGroups.map((g, i) => (
+                <div key={i} className="bg-ui-card border border-ui-border rounded-xl overflow-hidden">
+                  <div className="flex items-center gap-2 px-3 py-2 border-b border-ui-border bg-ui-bg">
+                    <span className="text-[10px] text-ui-accent uppercase tracking-wider">Signal name</span>
+                    <input value={g.signal} onChange={e => updateGroup(i, "signal", e.target.value)}
+                      className="flex-1 bg-transparent text-xs font-semibold text-blue-300 focus:outline-none" />
+                    {queryGroups.length > 1 && (
+                      <button onClick={() => removeGroup(i)}
+                        className="text-ui-accent hover:text-red-400 transition-colors ml-auto">
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <textarea value={g.queries}
+                    onChange={e => updateGroup(i, "queries", e.target.value)}
+                    rows={3} placeholder="One search query per line…"
+                    className="w-full bg-ui-card px-3 py-2 text-[11px] font-mono text-ui-text placeholder:text-ui-accent resize-y focus:outline-none" />
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* Search settings */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Search settings</p>
+            <div className="space-y-4">
+              <Field label="Geography" k="search_geo" placeholder="Malaysia, Southeast Asia" />
+              <div>
+                <label className="block text-xs font-medium text-ui-accent mb-2">Channels</label>
+                <div className="flex flex-wrap gap-2">
+                  {CHANNELS.map(ch => {
+                    const active = (form.search_channels as string[]).includes(ch);
+                    const chCfg = CHANNEL_CONFIG[ch];
+                    return (
+                      <button key={ch} onClick={() => toggleChannel(ch)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          active ? `${chCfg?.color ?? ""} opacity-100` : "border-ui-border text-ui-accent opacity-50 hover:opacity-80"
+                        }`}>
+                        {active && <span className={`w-1.5 h-1.5 rounded-full ${chCfg?.dot ?? "bg-gray-400"}`} />}
+                        {chCfg?.label ?? ch}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-ui-accent mb-1">
+                  Results per query: {form.max_results_per_query}
+                </label>
+                <input type="range" min={1} max={20} value={form.max_results_per_query}
+                  onChange={e => set("max_results_per_query", Number(e.target.value))}
+                  className="w-full max-w-xs" />
+              </div>
+            </div>
+          </section>
+
+          {/* Scoring */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Scoring thresholds</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(["hot_min", "warm_min", "save_min"] as const).map(k => (
+                <div key={k}>
+                  <label className="block text-xs text-ui-accent mb-1">
+                    {k === "hot_min" ? "🔥 Hot (min score)" : k === "warm_min" ? "Warm (min score)" : "Save (min score)"}
+                  </label>
+                  <input type="number" min={1} max={10} value={form[k]}
+                    onChange={e => set(k, Number(e.target.value))}
+                    className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text" />
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-ui-accent mt-2">
+              Leads below "Save" are discarded. Hot ≥ {form.hot_min}, Warm {form.warm_min}–{form.hot_min - 1}, Cold 1–{form.warm_min - 1}.
+            </p>
+          </section>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Context Inspector ──────────────────────────────────────────────────────────
 
-function ContextSection({ title, children }: { title: string; children: React.ReactNode }) {
+const CHANNEL_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+  linkedin:  { label: "LinkedIn",  color: "bg-blue-950 border-blue-700 text-blue-300",   dot: "bg-blue-500" },
+  reddit:    { label: "Reddit",    color: "bg-orange-950 border-orange-700 text-orange-300", dot: "bg-orange-500" },
+  instagram: { label: "Instagram", color: "bg-pink-950 border-pink-700 text-pink-300",   dot: "bg-pink-500" },
+  facebook:  { label: "Facebook",  color: "bg-indigo-950 border-indigo-700 text-indigo-300", dot: "bg-indigo-500" },
+  news:      { label: "News",      color: "bg-purple-950 border-purple-700 text-purple-300", dot: "bg-purple-500" },
+  google:    { label: "Google",    color: "bg-green-950 border-green-700 text-green-300",  dot: "bg-green-500" },
+};
+
+function ScoreBar({ hot, warm, save }: { hot: number; warm: number; save: number }) {
+  const pct = (n: number) => `${((n - 1) / 9) * 100}%`;
   return (
-    <div className="bg-ui-card border border-ui-border rounded-xl overflow-hidden">
-      <div className="px-4 py-3 bg-ui-bg border-b border-ui-border">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-ui-accent">{title}</h3>
+    <div className="mt-3">
+      <div className="relative h-5 rounded-full overflow-hidden" style={{
+        background: "linear-gradient(to right, #374151 0%, #374151 33%, #854d0e 33%, #854d0e 55%, #ea580c 55%, #ea580c 78%, #f97316 78%, #f97316 100%)",
+      }}>
+        {/* save threshold marker */}
+        <div className="absolute top-0 bottom-0 w-0.5 bg-white/40" style={{ left: pct(save) }} />
+        {/* warm threshold marker */}
+        <div className="absolute top-0 bottom-0 w-0.5 bg-white/60" style={{ left: pct(warm) }} />
+        {/* hot threshold marker */}
+        <div className="absolute top-0 bottom-0 w-0.5 bg-white/80" style={{ left: pct(hot) }} />
       </div>
-      <div className="p-4">{children}</div>
+      <div className="relative mt-1 h-4">
+        <span className="absolute text-[10px] text-gray-400 -translate-x-1/2" style={{ left: pct(save) }}>
+          {save} save
+        </span>
+        <span className="absolute text-[10px] text-yellow-400 -translate-x-1/2" style={{ left: pct(warm) }}>
+          {warm} warm
+        </span>
+        <span className="absolute text-[10px] text-orange-400 -translate-x-1/2" style={{ left: pct(hot) }}>
+          {hot} hot
+        </span>
+      </div>
+      <div className="flex justify-between text-[10px] text-ui-accent mt-3">
+        <span>1 — discard</span>
+        <span>10 — perfect fit</span>
+      </div>
+    </div>
+  );
+}
+
+function QueryGroup({ group }: { group: { signal: string; queries: string[] } }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="border border-ui-border rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-2.5 bg-ui-bg hover:bg-ui-card transition-colors text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-blue-300 uppercase tracking-wider">
+            {group.signal.replace(/_/g, " ")}
+          </span>
+          <span className="text-[10px] bg-blue-950 border border-blue-800 text-blue-400 px-1.5 py-0.5 rounded-full">
+            {group.queries.length} queries
+          </span>
+        </div>
+        <span className="text-ui-accent text-xs">{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div className="p-3 flex flex-wrap gap-1.5 border-t border-ui-border bg-ui-card">
+          {group.queries.map((q, i) => (
+            <span key={i} className="text-[11px] bg-ui-bg border border-ui-border rounded-lg px-2.5 py-1 text-ui-text font-mono leading-snug">
+              {q}
+            </span>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
 function ContextInspector({ context }: { context: AgentContext }) {
-  const [expandedPrompt, setExpandedPrompt] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
+  const totalQueries = (context.search_queries ?? []).reduce((n, g) => n + (g.queries?.length ?? 0), 0);
+  const initials = (context.config?.agent_name || context.config?.sender_company || "A")
+    .split(" ").slice(0, 2).map(w => w?.[0] ?? "").filter(Boolean).join("").toUpperCase() || "A";
+  const hot  = context.score_thresholds?.hot_min  ?? 8;
+  const warm = context.score_thresholds?.warm_min ?? 5;
+  const save = context.score_thresholds?.save_min ?? 4;
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-2 mb-2">
-        <Eye className="w-4 h-4 text-purple-400" />
-        <h2 className="font-semibold text-ui-text">Agent Context Inspector</h2>
-        <span className="text-xs text-ui-accent ml-2">Everything the AI sees when evaluating leads</span>
-      </div>
+    <div className="space-y-5">
 
-      <ContextSection title="Agent Identity & Sender">
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <span className="text-ui-accent text-xs">Agent Name</span>
-            <p className="text-ui-text font-medium">{context.config.agent_name || "—"}</p>
+      {/* ── Row 1: Identity · Scoring · Coverage ── */}
+      <div className="grid grid-cols-3 gap-4">
+
+        {/* Identity card */}
+        <div className="col-span-1 bg-ui-card border border-ui-border rounded-xl p-5 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="font-semibold text-ui-text truncate">{context.config.agent_name || "BD Agent"}</p>
+              <p className="text-xs text-ui-accent truncate">{context.config.sender_company}</p>
+            </div>
           </div>
-          <div>
-            <span className="text-ui-accent text-xs">Sender</span>
-            <p className="text-ui-text font-medium">{context.config.sender_name || "—"}</p>
-          </div>
-          <div>
-            <span className="text-ui-accent text-xs">Company</span>
-            <p className="text-ui-text font-medium">{context.config.sender_company || "—"}</p>
-          </div>
-          <div>
-            <span className="text-ui-accent text-xs">Description</span>
-            <p className="text-ui-text font-medium">{context.config.sender_description || "—"}</p>
+          <div className="border-t border-ui-border pt-3 space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-ui-accent">Sender</span>
+              <span className="text-ui-text font-medium truncate max-w-[60%] text-right">{context.config.sender_name || "—"}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-ui-accent">Role</span>
+              <span className="text-ui-text font-medium truncate max-w-[60%] text-right">{context.config.sender_description || "—"}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-ui-accent">Geo</span>
+              <span className="text-ui-text font-medium">{context.search_geo || "—"}</span>
+            </div>
           </div>
         </div>
-        {context.config.qualifier_context && context.config.qualifier_context !== "..." && (
-          <div className="mt-3 pt-3 border-t border-ui-border">
-            <span className="text-ui-accent text-xs">Qualifier Context</span>
-            <p className="text-sm text-ui-text mt-1 leading-relaxed">{context.config.qualifier_context}</p>
-          </div>
-        )}
-        {context.config.ideal_customer_profile && (
-          <div className="mt-3 pt-3 border-t border-ui-border">
-            <span className="text-ui-accent text-xs">Ideal Customer Profile</span>
-            <p className="text-sm text-ui-text mt-1 leading-relaxed">{context.config.ideal_customer_profile}</p>
-          </div>
-        )}
-        {context.config.what_we_offer && (
-          <div className="mt-3 pt-3 border-t border-ui-border">
-            <span className="text-ui-accent text-xs">What We Offer (used in outreach emails)</span>
-            <p className="text-sm text-ui-text mt-1 leading-relaxed">{context.config.what_we_offer}</p>
-          </div>
-        )}
-      </ContextSection>
 
-      <div className="grid grid-cols-2 gap-4">
-        <ContextSection title="Strong Signals (Good Leads)">
-          <ul className="space-y-1.5">
-            {context.strong_signals.map((s, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <span className="text-green-400 mt-0.5 flex-shrink-0">+</span>
-                <span className="text-ui-text">{s}</span>
-              </li>
-            ))}
-          </ul>
-        </ContextSection>
-
-        <ContextSection title="Weak / Irrelevant Signals (Ignore)">
-          <ul className="space-y-1.5">
-            {context.weak_signals.map((s, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm">
-                <span className="text-red-400 mt-0.5 flex-shrink-0">-</span>
-                <span className="text-ui-text">{s}</span>
-              </li>
-            ))}
-          </ul>
-        </ContextSection>
-      </div>
-
-      <ContextSection title={`Search Queries (${context.search_queries.reduce((n, g) => n + g.queries.length, 0)} total, ${context.max_results_per_query} results each, geo: ${context.search_geo})`}>
-        <div className="space-y-3">
-          {context.search_queries.map((group, i) => (
-            <div key={i}>
-              <div className="flex items-center gap-2 mb-1.5">
-                <Badge className="text-blue-400 bg-blue-950 border-blue-800">{group.signal}</Badge>
+        {/* Scoring band */}
+        <div className="col-span-1 bg-ui-card border border-ui-border rounded-xl p-5">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-1">Scoring thresholds</p>
+          <div className="flex gap-3 mb-3">
+            {[
+              { label: "Hot",  score: hot,  cls: "text-orange-400 bg-orange-950 border-orange-800" },
+              { label: "Warm", score: warm, cls: "text-yellow-400 bg-yellow-950 border-yellow-800" },
+              { label: "Save", score: save, cls: "text-gray-400 bg-gray-900 border-gray-700" },
+            ].map(({ label, score, cls }) => (
+              <div key={label} className={`flex-1 flex flex-col items-center py-2 rounded-lg border ${cls}`}>
+                <span className="text-lg font-bold leading-none">{score}+</span>
+                <span className="text-[10px] mt-0.5 font-medium">{label}</span>
               </div>
-              <div className="flex flex-wrap gap-1.5">
-                {group.queries.map((q, j) => (
-                  <span key={j} className="inline-block text-xs bg-ui-bg border border-ui-border rounded-lg px-2.5 py-1 text-ui-text font-mono">
-                    {q}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+          <ScoreBar
+            hot={hot}
+            warm={warm}
+            save={save}
+          />
         </div>
-      </ContextSection>
 
-      <div className="grid grid-cols-2 gap-4">
-        <ContextSection title="Result Schema">
-          <div className="space-y-2 text-sm">
-            <div>
-              <span className="text-ui-accent text-xs">Lead Name Field</span>
-              <p className="text-ui-text font-mono">{context.result_schema.lead_name_field}</p>
-            </div>
-            <div>
-              <span className="text-ui-accent text-xs">Categories</span>
-              <div className="flex flex-wrap gap-1 mt-0.5">
-                {context.result_schema.categories.map((c, i) => (
-                  <Badge key={i} className="text-ui-accent bg-ui-bg border-ui-border">{c}</Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="text-ui-accent text-xs">Geographies</span>
-              <div className="flex flex-wrap gap-1 mt-0.5">
-                {context.result_schema.geographies.map((g, i) => (
-                  <Badge key={i} className="text-ui-accent bg-ui-bg border-ui-border">{g}</Badge>
-                ))}
-              </div>
-            </div>
-            <div>
-              <span className="text-ui-accent text-xs">Signal Types</span>
-              <div className="flex flex-wrap gap-1 mt-0.5">
-                {context.result_schema.signal_types.map((s, i) => (
-                  <Badge key={i} className="text-blue-400 bg-blue-950 border-blue-800">{s}</Badge>
-                ))}
-              </div>
-            </div>
-          </div>
-        </ContextSection>
-
-        <ContextSection title="Scoring Thresholds">
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border text-orange-400 bg-orange-950 border-orange-800">
-                {context.score_thresholds.hot_min}+
-              </div>
-              <div>
-                <p className="text-ui-text font-medium">Hot Lead</p>
-                <p className="text-ui-accent text-xs">Score {context.score_thresholds.hot_min}-10 — clear, strong signal</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border text-yellow-400 bg-yellow-950 border-yellow-800">
-                {context.score_thresholds.warm_min}+
-              </div>
-              <div>
-                <p className="text-ui-text font-medium">Warm Lead</p>
-                <p className="text-ui-accent text-xs">Score {context.score_thresholds.warm_min}-{context.score_thresholds.hot_min - 1} — indirect signal</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold border text-gray-400 bg-gray-900 border-gray-700">
-                1+
-              </div>
-              <div>
-                <p className="text-ui-text font-medium">Cold Lead</p>
-                <p className="text-ui-accent text-xs">Score 1-{context.score_thresholds.warm_min - 1} — weak fit</p>
-              </div>
-            </div>
-            <div className="mt-2 pt-2 border-t border-ui-border text-xs text-ui-accent">
-              Minimum score to save: <strong className="text-ui-text">{context.score_thresholds.save_min}</strong> (below this, leads are discarded)
-            </div>
-          </div>
-        </ContextSection>
-      </div>
-
-      {context.starred_leads.length > 0 && (
-        <ContextSection title={`Starred Leads — Positive Examples (${context.starred_leads.length})`}>
-          <p className="text-xs text-ui-accent mb-3">
-            These starred leads are injected into the AI prompt as calibration examples. The AI scores similar companies higher.
-          </p>
-          <div className="space-y-2">
-            {context.starred_leads.map((l, i) => (
-              <div key={i} className="bg-ui-bg border border-ui-border rounded-lg p-3 flex items-start gap-3">
-                <Star className="w-3.5 h-3.5 text-yellow-400 fill-yellow-400 mt-0.5 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ui-text">{l.company_name}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <Badge className="text-blue-400 bg-blue-950 border-blue-800">{l.signal_type}</Badge>
-                    <Badge className="text-ui-accent bg-ui-bg border-ui-border">{l.country}</Badge>
-                    {l.fit_score && (
-                      <Badge className={PRIORITY_BADGE[l.fit_score >= 8 ? "hot" : l.fit_score >= 5 ? "warm" : "cold"]}>
-                        score: {l.fit_score}
-                      </Badge>
-                    )}
-                  </div>
-                  {l.raw_snippet && (
-                    <p className="text-xs text-ui-accent mt-1.5 line-clamp-2 font-mono">{l.raw_snippet}</p>
-                  )}
-                </div>
+        {/* Coverage stats */}
+        <div className="col-span-1 bg-ui-card border border-ui-border rounded-xl p-5 flex flex-col justify-between">
+          <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Search coverage</p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: "Signal groups", value: context.search_queries.length },
+              { label: "Total queries",  value: totalQueries },
+              { label: "Results / query", value: context.max_results_per_query },
+              { label: "Batch size",     value: context.batch_size === 0 ? "∞" : context.batch_size },
+            ].map(({ label, value }) => (
+              <div key={label} className="bg-ui-bg border border-ui-border rounded-lg p-2.5">
+                <p className="text-[10px] text-ui-accent">{label}</p>
+                <p className="text-xl font-bold text-ui-text">{value}</p>
               </div>
             ))}
           </div>
-        </ContextSection>
+          {/* Channels */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {context.search_channels.map(ch => {
+              const cfg = CHANNEL_CONFIG[ch] ?? { label: ch, color: "bg-ui-bg border-ui-border text-ui-accent", dot: "bg-gray-500" };
+              return (
+                <span key={ch} className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${cfg.color}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+                  {cfg.label}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 2: ICP · What we offer ── */}
+      {(context.config.qualifier_context || context.config.ideal_customer_profile || context.config.what_we_offer) && (
+        <div className="grid grid-cols-3 gap-4">
+          {context.config.qualifier_context && context.config.qualifier_context !== "..." && (
+            <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+              <p className="text-[10px] uppercase tracking-wider text-purple-400 font-semibold mb-2">Qualifier context</p>
+              <p className="text-xs text-ui-text leading-relaxed">{context.config.qualifier_context}</p>
+            </div>
+          )}
+          {context.config.ideal_customer_profile && (
+            <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+              <p className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold mb-2">Ideal customer profile</p>
+              <p className="text-xs text-ui-text leading-relaxed">{context.config.ideal_customer_profile}</p>
+            </div>
+          )}
+          {context.config.what_we_offer && (
+            <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+              <p className="text-[10px] uppercase tracking-wider text-green-400 font-semibold mb-2">What we offer</p>
+              <p className="text-xs text-ui-text leading-relaxed">{context.config.what_we_offer}</p>
+            </div>
+          )}
+        </div>
       )}
 
-      <ContextSection title="Full AI System Prompt (sent to Ollama for every lead)">
+      {/* ── Row 3: Strong signals · Weak signals ── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+          <p className="text-[10px] uppercase tracking-wider text-green-400 font-semibold mb-3">
+            Strong signals <span className="text-ui-accent normal-case">— score higher</span>
+          </p>
+          <div className="space-y-2">
+            {context.strong_signals.map((s, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs bg-green-950/40 border border-green-900 rounded-lg px-3 py-2">
+                <span className="text-green-400 font-bold flex-shrink-0 mt-px">+</span>
+                <span className="text-green-200 leading-snug">{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+          <p className="text-[10px] uppercase tracking-wider text-red-400 font-semibold mb-3">
+            Weak signals <span className="text-ui-accent normal-case">— score lower or ignore</span>
+          </p>
+          <div className="space-y-2">
+            {context.weak_signals.map((s, i) => (
+              <div key={i} className="flex items-start gap-2 text-xs bg-red-950/40 border border-red-900 rounded-lg px-3 py-2">
+                <span className="text-red-400 font-bold flex-shrink-0 mt-px">−</span>
+                <span className="text-red-200 leading-snug">{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 4: Query groups ── */}
+      <div>
+        <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-2">
+          Search queries — {totalQueries} queries across {context.search_queries.length} signal groups
+        </p>
+        <div className="space-y-2">
+          {context.search_queries.map((g, i) => <QueryGroup key={i} group={g} />)}
+        </div>
+      </div>
+
+      {/* ── Row 5: Output schema ── */}
+      <div className="bg-ui-card border border-ui-border rounded-xl p-4">
+        <p className="text-[10px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Output schema — fields the AI extracts per lead</p>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[10px] text-ui-accent mb-1.5">Name field</p>
+            <span className="text-xs font-mono bg-ui-bg border border-ui-border px-2 py-1 rounded text-ui-text">
+              {context.result_schema.lead_name_field}
+            </span>
+          </div>
+          <div>
+            <p className="text-[10px] text-ui-accent mb-1.5">Categories</p>
+            <div className="flex flex-wrap gap-1">
+              {context.result_schema.categories.map((c, i) => (
+                <span key={i} className="text-[10px] bg-ui-bg border border-ui-border rounded px-1.5 py-0.5 text-ui-text">{c}</span>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="text-[10px] text-ui-accent mb-1.5">Signal types</p>
+            <div className="flex flex-wrap gap-1">
+              {context.result_schema.signal_types.map((s, i) => (
+                <span key={i} className="text-[10px] bg-blue-950 border border-blue-800 rounded px-1.5 py-0.5 text-blue-300">{s.replace(/_/g, " ")}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="mt-3">
+          <p className="text-[10px] text-ui-accent mb-1.5">Geographies</p>
+          <div className="flex flex-wrap gap-1">
+            {context.result_schema.geographies.map((g, i) => (
+              <span key={i} className="text-[10px] bg-ui-bg border border-ui-border rounded px-1.5 py-0.5 text-ui-text">{g}</span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 6: Starred leads ── */}
+      {context.starred_leads.length > 0 && (
+        <div>
+          <p className="text-[11px] uppercase tracking-wider text-yellow-400 font-semibold mb-2">
+            Starred leads — {context.starred_leads.length} positive example{context.starred_leads.length !== 1 ? "s" : ""} injected into the AI prompt
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {context.starred_leads.map((l, i) => {
+              const priority = l.fit_score >= (context.score_thresholds?.hot_min ?? 8) ? "hot"
+                             : l.fit_score >= (context.score_thresholds?.warm_min ?? 5) ? "warm" : "cold";
+              return (
+                <div key={i} className={`bg-ui-card border-l-4 border border-ui-border rounded-xl p-3 ${PRIORITY_BORDER[priority]}`}>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <Star className="w-3 h-3 text-yellow-400 fill-yellow-400 flex-shrink-0" />
+                    <span className="text-sm font-semibold text-ui-text truncate">{l.company_name}</span>
+                    <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded-full border font-bold ${PRIORITY_BADGE[priority]}`}>
+                      {l.fit_score}/10
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1 mb-1.5">
+                    <Badge className="text-blue-400 bg-blue-950 border-blue-800">{(l.signal_type || "").replace(/_/g, " ")}</Badge>
+                    <Badge className="text-ui-accent bg-ui-bg border-ui-border">{l.country}</Badge>
+                  </div>
+                  {l.raw_snippet && (
+                    <p className="text-[11px] text-ui-accent font-mono line-clamp-2 leading-snug">{l.raw_snippet}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Row 7: Raw prompt ── */}
+      <div className="bg-ui-card border border-ui-border rounded-xl overflow-hidden">
         <button
-          onClick={() => setExpandedPrompt(!expandedPrompt)}
-          className="text-xs text-blue-400 hover:underline mb-2 flex items-center gap-1"
+          onClick={() => setShowPrompt(p => !p)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-ui-bg hover:bg-ui-card transition-colors text-left"
         >
-          {expandedPrompt ? "Collapse" : "Expand full prompt"}
+          <span className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold">
+            Full AI system prompt — sent to Ollama for every lead
+          </span>
+          <span className="text-xs text-blue-400">{showPrompt ? "Hide ▲" : "Show ▼"}</span>
         </button>
-        {expandedPrompt && (
-          <pre className="bg-ui-bg border border-ui-border rounded-lg p-3 text-xs font-mono leading-relaxed text-ui-accent whitespace-pre-wrap break-words max-h-[500px] overflow-y-auto">
+        {showPrompt && (
+          <pre className="p-4 text-[11px] font-mono leading-relaxed text-ui-accent whitespace-pre-wrap break-words max-h-[500px] overflow-y-auto border-t border-ui-border">
             {context.qualifier_prompt}
-            {context.starred_context && (
-              <>
-                {"\n\n"}
-                {context.starred_context}
-              </>
-            )}
+            {context.starred_context ? `\n\n${context.starred_context}` : ""}
           </pre>
         )}
-      </ContextSection>
+      </div>
     </div>
   );
 }
@@ -906,6 +1611,7 @@ function Dashboard({
   const [jobStatus, setJobStatus] = useState<{ job: string; state: string; detail: string; ts: string } | null>(null);
   const [toast, setToast]         = useState("");
   const [correcting, setCorrecting] = useState(false);
+  const [editing, setEditing]       = useState(false);
   const [agentContext, setAgentContext] = useState<AgentContext | null>(null);
   const [search, setSearch]   = useState("");
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
@@ -1110,7 +1816,7 @@ function Dashboard({
     <div className="h-full flex overflow-hidden bg-ui-bg text-ui-text text-sm relative">
       {/* Sidebar */}
       <aside className="w-52 flex-shrink-0 bg-ui-card border-r border-ui-border p-4 flex flex-col gap-1">
-        <p className="text-[11px] font-semibold text-ui-text px-3 py-1 truncate">{config.agent_name || project.name}</p>
+        <p className="text-[11px] font-semibold text-ui-text px-3 py-1 truncate">{project.name}</p>
         <p className="text-[10px] text-ui-accent px-3 mb-1 truncate">{config.sender_company}</p>
         <button
           onClick={onSwitchProject}
@@ -1195,6 +1901,10 @@ function Dashboard({
         <button onClick={() => setCorrecting(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 transition-colors">
           Leads not accurate?
+        </button>
+        <button onClick={() => { fetchContext(); setEditing(true); }}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 transition-colors">
+          Edit configuration
         </button>
         <button onClick={downloadCsv} disabled={displayed.length === 0}
           title="Download visible leads as CSV"
@@ -1404,6 +2114,15 @@ function Dashboard({
         />
       )}
 
+      {editing && agentContext && (
+        <EditConfigPanel
+          projectId={pid}
+          context={agentContext}
+          onDone={(cfg) => { onConfigUpdated(cfg); fetchContext(); showToast("Configuration saved"); }}
+          onClose={() => setEditing(false)}
+        />
+      )}
+
       {toast && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-green-600 text-white text-xs font-semibold px-4 py-2 rounded-full z-50 shadow-lg">
           {toast}
@@ -1469,6 +2188,15 @@ export default function PollenBDTool() {
     }
   };
 
+  const handleDeleteProject = async (pid: string) => {
+    try {
+      const r = await fetch(`${API}/pollen/projects/${pid}`, { method: "DELETE" });
+      if (r.ok) {
+        setProjects(prev => prev.filter(p => p.id !== pid));
+      }
+    } catch { /* ignore */ }
+  };
+
   const handleSwitchProject = () => {
     setActiveProject(null);
     setConfig(null);
@@ -1491,6 +2219,7 @@ export default function PollenBDTool() {
         loading={loadingProjects}
         onSelect={handleSelectProject}
         onRefresh={loadProjects}
+        onDelete={handleDeleteProject}
       />
     );
   }

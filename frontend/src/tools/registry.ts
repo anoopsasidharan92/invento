@@ -26,8 +26,8 @@ const tools: ToolDefinition[] = [
   },
   {
     id: "pollen-bd",
-    name: "Pollen BD Agent",
-    description: "AI-powered lead finder for FMCG brands with excess inventory. Review, score, and draft outreach.",
+    name: "BD Agent",
+    description: "AI-powered lead finder for brands with excess inventory. Review, score, and draft outreach.",
     icon: "🌱",
     color: "bg-green-900",
     status: "live",
