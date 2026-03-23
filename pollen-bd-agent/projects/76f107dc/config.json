@@ -1,0 +1,69 @@
+{
+  "agent_name": "Pollen Tech BD Agent",
+  "sender_name": "Pollen Tech Supply Chain Solutions Team",
+  "sender_company": "Pollen Tech",
+  "sender_description": "Supply chain solutions company helping FMCG brands recover value from excess inventory in Southeast Asia and India",
+  "qualifier_context": "Pollen Tech helps FMCG brands stop losing money on excess inventory. We're FMCG-specific, connected to real demand, and enterprise-proven. Reach out for a structured solution to your write-off problem.",
+  "ideal_customer_profile": "Mid-to-large companies in Southeast Asia and India facing inventory issues",
+  "what_we_offer": "Lily AI-powered liquidation management system that automates clearance, connects brands with verified B2B buyers, and reduces working capital tied up in excess inventory",
+  "strong_signals": [
+    "Operational triggers: packaging refresh, product discontinuation, distributor termination, post-campaign overstock",
+    "Organizational triggers: new Supply Chain Director or Head of Operations, demand planning or S&OP role being hired, regional restructuring or market exit",
+    "Financial triggers: earnings commentary mentioning inventory provisions or write-off increases, public statements about working capital optimization"
+  ],
+  "weak_signals": [
+    "General supply chain concerns or cost-saving initiatives without clear inventory implications"
+  ],
+  "search_queries": [
+    {
+      "signal": "operational_trigger",
+      "queries": [
+        "\"new pack format\" + \"clearance\"",
+        "\"product discontinuation\""
+      ]
+    },
+    {
+      "signal": "organizational_trigger",
+      "queries": [
+        "\"Supply Chain Director new hire\"",
+        "\"demand planning role hiring\""
+      ]
+    },
+    {
+      "signal": "financial_trigger",
+      "queries": [
+        "(\"inventory provisions increase\") + \"write-off\"",
+        "(\"working capital optimization\") + \"cost reduction\""
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news",
+    "google",
+    "reddit"
+  ],
+  "search_geo": "Malaysia India Thailand Singapore Indonesia",
+  "max_results_per_query": 5,
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "Southeast Asia/India company"
+    ],
+    "geographies": [
+      "Southeast Asia",
+      "India"
+    ],
+    "signal_types": [
+      "string:operational_trigger",
+      "string:organizational_trigger",
+      "string:financial_trigger"
+    ]
+  },
+  "batch_size": 0
+}

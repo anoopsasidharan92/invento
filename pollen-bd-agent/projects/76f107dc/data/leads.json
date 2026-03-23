@@ -1,0 +1,463 @@
+{
+  "39d175cf2d": {
+    "company_name": "Riparian LLC",
+    "category": "Pharmaceutical company|Southeast Asia/India company",
+    "country": "Southeast Asia/India",
+    "fit_score": 8,
+    "fit_reason": "Operational trigger: Pharmaceutical product discontinuation found in snippet, likely impacting inventory write-offs",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Addressing Regulatory Friction and Data Gaps with Inventory Management Solutions",
+      "body": "Hi Riparian LLC team,\nI saw that pharmaceutical product discontinuation has been a source of regulatory friction, data gaps, and confusion across stakeholders. That's why our company Pollen Tech offers an AI-powered liquidation management system to connect brands with verified B2B buyers and reduce working capital tied up in excess inventory.\nBest regards, Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://ph.linkedin.com/company/riparian-llc",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "Pharmaceutical product discontinuation has been a source of regulatory friction, data gaps, and confusion across stakeholders.",
+    "id": "39d175cf2d",
+    "found_at": "2026-03-22T12:56:39.382756",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "a71384be24": {
+    "company_name": "DPMG",
+    "category": "Pharmaceuticals company|Southeast Asia company",
+    "country": "Southeast Asia",
+    "fit_score": 8,
+    "fit_reason": "Operational trigger: product discontinuation and subsequent site closure, indicating potential inventory management issues",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Recovering Value from Excess Inventory after Product Discontinuation",
+      "body": "Hi DPMG team, I saw that DPMG is closing a production suite following product discontinuation. Our liquidation management system can help you clear excess inventory and reduce working capital tied up in obsolete stock.",
+      "from": "Pollen Tech Supply Chain Solutions Team at Pollen Tech"
+    },
+    "source_url": "https://ie.linkedin.com/company/decommissioning-pharma-management-group",
+    "signal_type": "string:operational_trigger",
+    "id": "a71384be24",
+    "found_at": "2026-03-22T12:57:30.733334",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "e8184923ba": {
+    "company_name": "Doshi Jain Co",
+    "category": "FMCG brand|Southeast Asia/India company",
+    "country": "Southeast Asia|India",
+    "fit_score": 4,
+    "fit_reason": "Financial trigger: Cost reduction & working capital optimization mentioned, which is relevant to Pollen Tech's solution for inventory write-offs and working capital optimization.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Optimize Working Capital with Pollen Tech's AI-Powered Liquidation Management",
+      "body": "I saw that Doshi Jain Co is focusing on cost reduction & working capital optimization. As a leading supply chain solutions company, we help FMCG brands recover value from excess inventory. Our Lily AI-powered liquidation management system can automate clearance and connect you with verified B2B buyers to reduce working capital tied up in excess inventory."
+    },
+    "source_url": "https://in.linkedin.com/company/doshi-jain-co",
+    "signal_type": "string:financial_trigger",
+    "raw_snippet": "... Cost reduction & working capital optimization, Tax Function Outsourcing, and Complex advisory & structuring. Locations. Primary. Unit F5- 1, 5th floor ...",
+    "id": "e8184923ba",
+    "found_at": "2026-03-22T13:00:00.768404",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "4713a59a98": {
+    "company_name": "Meta",
+    "category": "FMCG brand|Metaverse company",
+    "country": "None (global)",
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: restructuring/merging out a failed business unit, specifically the metaverse division.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Meta's Metaverse Discontinuation Signals Opportunity for Inventory Optimization",
+      "body": "I saw that Meta is unwinding its Horizon Worlds project after significant investments. As an FMCG brand navigating similar inventory challenges, I wanted to introduce you to Pollen Tech's AI-powered liquidation management system that can help reduce write-offs and working capital tied up in excess inventory."
+    },
+    "source_url": "https://www.tradingview.com/news/tradingview:d8ac6c11d094b:0-meta-meta-stock-steady-after-company-pulls-the-plug-on-80-billion-metaverse-flop/",
+    "signal_type": "organizational_trigger",
+    "id": "4713a59a98",
+    "found_at": "2026-03-22T13:05:51.454419",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "8bf5c6145b": {
+    "company_name": "IDT",
+    "category": "FMCG brand",
+    "country": "",
+    "fit_score": 9,
+    "fit_reason": "Operational trigger: product discontinuation notice from IDT, indicating a specific reason for discontinuing certain products.",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Re: Product Discontinuation Notice from IDT - Opportunity to Recover Value from Excess Inventory",
+      "body": "Dear IDT Team,\n\nI saw that IDT is discontinuing certain products. As a company helping FMCG brands recover value from excess inventory in Southeast Asia and India, I wanted to reach out to discuss how our AI-powered liquidation management system can help you automate clearance and connect with verified B2B buyers.\n\nBest,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.renesas.com/us/en/document/eln/pdn-ai-19-03-product-discontinuation-notice",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "CUSTOMER NOTIFICATION: As a result of discontinuance reason(s) listed above, IDT has decided to discontinue certain products and notify you.",
+    "id": "8bf5c6145b",
+    "found_at": "2026-03-22T13:07:46.108089",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "816131cc85": {
+    "company_name": "Nike",
+    "category": "FMCG brand|Sportswear company",
+    "country": "United States",
+    "fit_score": 4,
+    "fit_reason": "Organizational trigger: new job cuts as part of supply chain automation efforts, potentially affecting inventory management and procurement processes",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Supply Chain Automation for Excess Inventory Management",
+      "body": "Hi Nike Team, I saw that Nike is laying off workers in 2026 as part of its supply chain automation efforts. This could be an opportunity to optimize your inventory management and reduce write-offs. Our AI-powered liquidation management system can help connect you with verified buyers and automate clearance processes. Let's discuss how Pollen Tech can support your recovery from excess inventory."
+    },
+    "source_url": "https://www.fastcompany.com/91481694/nike-layoffs-2026-hundreds-of-job-cuts-shoe-giant-cites-supply-chain-automation",
+    "signal_type": "string:organizational_trigger",
+    "id": "816131cc85",
+    "found_at": "2026-03-22T13:08:21.848169",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "1adfe46460": {
+    "company_name": "Co-op",
+    "category": "FMCG brand",
+    "country": "United Kingdom",
+    "fit_score": 7,
+    "fit_reason": "The appointment of a new Supply Chain and Logistics Director is an organizational trigger relevant to the ICP, indicating potential changes in supply chain management that could impact inventory levels.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Supply Chain & Logistics Director at Co-op: Relevant for Inventory Optimization",
+      "body": "Hi [First Name],I saw that Co-op has hired a new Supply Chain and Logistics Director, Andy Wilmot. This is an organizational trigger relevant to the FMCG industry in Southeast Asia/India, indicating potential changes in supply chain management that could impact inventory levels. Our AI-powered liquidation management system can help Co-op recover value from excess inventory, reducing working capital tied up in stock. Would love to discuss further. Best, [Your Name]Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.thegrocer.co.uk/news/co-op-hires-new-supply-chain-and-logistics-director/715720.article",
+    "signal_type": "organizational_trigger",
+    "id": "1adfe46460",
+    "found_at": "2026-03-22T13:09:00.239620",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "8f5825343f": {
+    "company_name": null,
+    "category": "General industry news",
+    "country": null,
+    "fit_score": 4,
+    "fit_reason": "Financial trigger: mentions supply chain management in relation to Trump's tariffs, which may impact FMCG brands indirectly.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Supply Chain Implications of Tariffs",
+      "body": "I saw that your company is impacted by the rising rate of job layoffs inside supply chain due to Trump's tariffs. Our team at Pollen Tech can help you optimize working capital tied up in excess inventory, reducing potential write-offs. Would you like to discuss how our AI-powered liquidation management system can assist?"
+    },
+    "source_url": "https://www.cnbc.com/2026/01/12/trump-tariffs-jobs-layoffs-economy.html",
+    "signal_type": "string:financial_trigger",
+    "id": "8f5825343f",
+    "found_at": "2026-03-22T13:09:33.232561",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "0352059a88": {
+    "company_name": "Scottish Agricultural Organisation Society",
+    "category": "FMCG brand|Cooperative",
+    "country": "Scotland",
+    "fit_score": 8,
+    "fit_reason": "Organizational trigger: new Supply Chain Director or Head of Operations role being hired, specifically a supply chain project manager position within the SAOS.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Clearance opportunities for excess FMCG inventory in Scotland and India",
+      "body": "Hi Mikaela Linden, I saw that you've joined SAOS as a supply chain project manager. Our team at Pollen Tech helps FMCG brands recover value from excess inventory in Southeast Asia and India. Would love to discuss how our liquidation management system can help your organization.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.thenews.coop/new-supply-chain-manager-for-scottish-farm-co-ops-apex/",
+    "signal_type": "organizational_trigger",
+    "id": "0352059a88",
+    "found_at": "2026-03-22T13:10:13.799419",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "f81f16ca23": {
+    "company_name": "Amazon",
+    "category": "FMCG brand|N/A",
+    "country": "N/A",
+    "fit_score": 5,
+    "fit_reason": "The article mentions Amazon planning to cut as many as 30,000 corporate jobs, which might impact its supply chain and inventory management operations relevant to FMCG brands.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Job Cuts at Amazon Could Impact Supply Chain Operations",
+      "body": "Hi from the Pollen Tech Supply Chain Solutions Team. I saw that Amazon is planning to cut as many as 30,000 corporate jobs, which might impact its supply chain and inventory management operations relevant to FMCG brands like yours. We help brands recover value from excess inventory in Southeast Asia and India. Would you like to discuss how our solutions can support your business.",
+      "from": "Pollen Tech Supply Chain Solutions Team <supplychain@solutions.com>"
+    },
+    "source_url": "https://www.reuters.com/business/world-at-work/amazon-targets-many-30000-corporate-job-cuts-sources-say-2025-10-27/",
+    "signal_type": "string:financial_trigger",
+    "id": "f81f16ca23",
+    "found_at": "2026-03-22T13:25:02.334872",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "0bc177874c": {
+    "company_name": "Coronado Global Resources",
+    "category": "FMCG brand|General Industry company",
+    "country": "Australia",
+    "fit_score": 4,
+    "fit_reason": "Financial trigger: Mention of asset-based lending facility and financial flexibility, but no clear relation to excess inventory or write-offs",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Boosting Financial Flexibility for FMCG Inventory Management",
+      "body": "Hi Coronado Global Resources team, I saw that you secured $150M through asset-based lending. This could help improve your financial flexibility, which might be beneficial in managing excess inventory and optimizing working capital. Our AI-powered liquidation management system can help you reduce write-offs and clear stock. Let's discuss how.",
+      "from": "Pollen Tech Supply Chain Solutions Team at Pollen Tech"
+    },
+    "source_url": "https://discoveryalert.com.au/asset-based-lending-facility-2025-financial-flexibility/",
+    "signal_type": "string:financial_trigger",
+    "raw_snippet": "Discover how Coronado Global Resources secures $150M through asset-based lending, boosting expansion and financial flexibility.",
+    "id": "0bc177874c",
+    "found_at": "2026-03-22T13:32:33.346090",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "854b196c56": {
+    "company_name": "SGS Maine Pointe",
+    "category": "Supply chain and operations consultancy|FMCG brand (private equity practice)",
+    "country": "US",
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: Dan Ginsberg rejoins SGS Maine Pointe as managing director, potentially indicating changes in supply chain strategy or focus.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Leadership at SGS Maine Pointe - Relevant to Your Supply Chain Needs",
+      "body": "Hi [Company], I saw that Dan Ginsberg has rejoined SGS Maine Pointe as managing director. As a leading supply chain consultancy for FMCG brands in Southeast Asia and India, we help our clients optimize their inventory management and reduce write-offs. Our AI-powered liquidation management system could be beneficial to your company. Would you like to discuss how we can support your team.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.consulting.us/news/8385/dan-ginsberg-rejoins-maine-pointe-as-managing-director",
+    "signal_type": "organizational_trigger",
+    "id": "854b196c56",
+    "found_at": "2026-03-22T13:32:58.107381",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "64fd25a0c7": {
+    "company_name": "iRecycleKC",
+    "category": "Electronics recycling company",
+    "country": "United States",
+    "fit_score": 6,
+    "fit_reason": "The signal 'Product Discontinuation & EOL Recycling Services' is related to inventory management, indicating potential interest in managing excess inventory. However, the specific trigger is not directly applicable to FMCG or Southeast Asia/India.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Inventory Management Opportunities with Pollen Tech",
+      "body": "Hi iRecycleKC team, I saw that you're offering Product Discontinuation & EOL Recycling Services. As an FMCG company in Southeast Asia/India, we struggle with managing excess inventory. Our AI-powered liquidation management system can help. Would love to explore how our solution can complement your services.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.linkedin.com/company/irecyclekc",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "iRecycleKC now offers Product Discontinuation & EOL Recycling Services.",
+    "id": "64fd25a0c7",
+    "found_at": "2026-03-22T14:11:52.348695",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "596703e666": {
+    "company_name": "BiomX",
+    "category": "Biotech company",
+    "country": "",
+    "fit_score": 4,
+    "fit_reason": "Financial trigger: 'strategic and financial reset' in efforts to improve the biotech's financial position, which could be relevant for an FMCG brand struggling with inventory write-offs",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Resetting After Adverse Events: How Pollen Tech Can Help",
+      "body": "I saw that BiomX is undergoing a 'strategic and financial reset' in efforts to improve the biotech's financial position. As an FMCG brand dealing with inventory write-offs, we can help you optimize working capital and reduce losses. Our AI-powered liquidation management system connects brands with verified B2B buyers and reduces excess inventory. Let's discuss how Pollen Tech can support your business."
+    },
+    "source_url": "https://www.fiercebiotech.com/biotech/phage-focused-biomx-resets-after-adverse-events-derail-pipeline-considers-pivot-defense",
+    "signal_type": "financial_trigger",
+    "raw_snippet": "Phage-focused BiomX is undergoing a \u201cstrategic and financial reset\u201d in efforts to improve the biotech's financial position.",
+    "id": "596703e666",
+    "found_at": "2026-03-22T14:17:58.972661",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "804c7fa035": {
+    "company_name": "...Levi's...",
+    "category": "FMCG/ Retail company",
+    "country": "USA",
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: new Supply Chain Director or Head of Operations role being hired, Chris Callieri is appointed as SVP and chief supply chain officer",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Leadership at Levi's Brings Fresh Perspective to Supply Chain Management",
+      "body": "Hi [First Name], I saw that Levi\u2019s has hired Victoria\u2019s Secret\u2019s former supply chain executive, Chris Callieri. Given his expertise in supply chain management, this new role could bring significant changes to their operations. At Pollen Tech, we help FMCG brands like yours recover value from excess inventory through our AI-powered liquidation management system. Would you like to learn more about how we can support your business?",
+      "from": "Pollen Tech Supply Chain Solutions Team <supplychain.solutions@pollentech.com>"
+    },
+    "source_url": "https://www.supplychaindive.com/news/levis-hires-victorias-secret-chief-supply-chain-officer/758097/",
+    "signal_type": "organizational_trigger",
+    "id": "804c7fa035",
+    "found_at": "2026-03-22T14:21:16.856211",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "92826d16e1": {
+    "company_name": "Corona",
+    "category": "Beverages company",
+    "country": "India",
+    "fit_score": 7,
+    "fit_reason": "Operational trigger: packaging refresh signal, hinting at product discontinuation or reformulation in wholesale and convenience channel",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Pack Format Launch in Wholesale & Convenience Channel - Fit for Pollen Tech Solutions",
+      "body": "Hi Corona Team,\n\nI saw that Corona is launching a new pack format in the wholesale and convenience channel. This packaging refresh could be an opportunity to optimize inventory management and minimize write-offs. Our AI-powered liquidation management system can help you connect with verified buyers and reduce working capital tied up in excess inventory.\nBest regards, Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.kamcity.com/namnews/products-promotions/corona-launches-new-pack-format-in-the-wholesale-and-convenience-channel/",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "Corona Launches New Pack Format In The Wholesale ...",
+    "id": "92826d16e1",
+    "found_at": "2026-03-22T14:33:28.889316",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "b6c207f2b4": {
+    "company_name": "Tetley",
+    "category": "FMCG company",
+    "country": "India (specifically mentioned)",
+    "fit_score": 9,
+    "fit_reason": "Operational trigger: packaging refresh",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Tetley's Packaging Refresh: How We Can Help Recover Value",
+      "body": "I saw that Tetley is making a major change to their packaging. As an FMCG brand in India, this could be an opportunity for your company to recover value from excess inventory. Our Lily AI-powered liquidation management system can help you automate clearance and connect with verified B2B buyers.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.kamcity.com/namnews/products-promotions/tetley-makes-major-packaging-change/",
+    "signal_type": "operational_trigger",
+    "raw_snippet": " Packs of Tetley Original, Decaf, Extra Strong and Gold are all moving to the new pack format.",
+    "id": "b6c207f2b4",
+    "found_at": "2026-03-22T14:33:49.526276",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "56257dce8d": {
+    "company_name": "Rexam Food & Beverage Plastics",
+    "category": "Southeast Asia/India company",
+    "country": "Europe",
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: new pack format for ready meals, likely prompting a packaging refresh or product discontinuation.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Pack Format for Ready Meals: A Potential Opportunity for Inventory Optimization",
+      "body": "Hi YUMPU Team,\r\nI saw that you're adopting new pack formats for ready meals to the European market. This change might require a packaging refresh, potentially leading to excess inventory. Our AI-powered liquidation management system can help connect your business with verified B2B buyers and reduce working capital tied up in excess inventory.\r\nBest,\r\nPollen Tech Supply Chain Solutions Team at Pollen Tech"
+    },
+    "source_url": "https://www.yumpu.com/en/document/view/59556/rexam-delivering-value-rexam-food-beverage-plastics",
+    "signal_type": "organizational_trigger",
+    "id": "56257dce8d",
+    "found_at": "2026-03-22T14:34:11.917988",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "ce434b201e": {
+    "company_name": null,
+    "category": "General company",
+    "country": null,
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: new guidance on product discontinuation strategy for businesses, potentially applicable to FMCG companies in Southeast Asia and India.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Navigating Product Discontinuation Strategy for Your Business",
+      "body": "Hi,\n\nI saw that Medium published a guide on product discontinuation strategy. As an FMCG company, you may face challenges with inventory management due to product discontinuations. Our AI-powered liquidation management system can help you connect with verified B2B buyers and reduce working capital tied up in excess inventory.\nBest,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://medium.com/@muonagolusandra/navigating-product-discontinuation-a-guide-for-businesses-a81bc2c15e46",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "Ultimately, a well-executed product discontinuation strategy can be a pivotal step toward the long-term success of your business or future ...",
+    "id": "ce434b201e",
+    "found_at": "2026-03-22T14:51:22.902447",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "08896e5e2f": {
+    "company_name": "Proxima",
+    "category": "Southeast Asia company",
+    "country": "Southeast Asia",
+    "fit_score": 6,
+    "fit_reason": "The article mentions working capital optimization, which is a relevant topic for FMCG brands struggling with excess inventory. However, the signal is not specific to Proxima's approach or its impact on inventory management.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Unlocking Cash Flow Potential through Efficient Inventory Management",
+      "body": "Hi Proxima Team,\nI saw that Proxima is discussing working capital optimization. This is a critical area for FMCG brands like you, who often face inventory challenges. Our AI-powered liquidation management system can help optimize your inventory and reduce write-offs. I'd love to discuss how our solution can support your efforts in unlocking cash flow potential.\nBest regards,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://proximagroup.com/define/mastering-working-capital-proximas-approach-to-unlocking-cash-flow-potential/",
+    "signal_type": "financial_trigger",
+    "raw_snippet": "... cost reduction, investment in automation, or preparations for an IPO ... At Proxima, we understand that working capital optimization is critical ...",
+    "id": "08896e5e2f",
+    "found_at": "2026-03-22T14:52:21.490931",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "304861bfab": {
+    "company_name": "Kat Von D Beauty",
+    "category": "Beauty company",
+    "country": "United States",
+    "fit_score": 8,
+    "fit_reason": "Operational trigger: product discontinuation of Kat Von D Lock It concealer, which could be relevant to FMCG brands with similar products.",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Re: Which product discontinuation are you not over?",
+      "body": "Hi Kat Von D Beauty team, I saw that Kat Von D Lock It concealer is discontinued and wondered if you're exploring alternative options to minimize excess inventory. As a company helping FMCG brands recover value from excess inventory in Southeast Asia and India, we might be able to help. Our AI-powered liquidation management system automates clearance and connects brands with verified B2B buyers. Would love to discuss further.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.reddit.com/r/MakeupAddiction/comments/1apbgia/which_product_discontinuation_are_you_not_over/",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "For me it is the Kat Von D Lock It concealer.",
+    "id": "304861bfab",
+    "found_at": "2026-03-22T14:53:02.465077",
+    "status": "new",
+    "notes": "",
+    "channel": "reddit",
+    "channel_label": "Reddit"
+  },
+  "1407f9f42a": {
+    "company_name": null,
+    "category": null,
+    "country": null,
+    "fit_score": 4,
+    "fit_reason": "Weak signal: no specific trigger for FMCG inventory issues or Pollen Tech's solution",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Cost Optimization Opportunities for FMCG Brands in Southeast Asia and India",
+      "body": "Hi, I saw that there's a discussion about cost reduction opportunities. As a finance consulting firm helping FMCG brands optimize working capital, I wanted to reach out and see if we can help with similar initiatives.",
+      "from": "Pollen Tech Supply Chain Solutions Team at Pollen Tech"
+    },
+    "source_url": "https://www.reddit.com/r/Big4/comments/1o5yox4/has_anyone_interviewed_for_eys_finance_consulting/",
+    "signal_type": null,
+    "id": "1407f9f42a",
+    "found_at": "2026-03-22T14:53:54.608656",
+    "status": "new",
+    "notes": "",
+    "channel": "reddit",
+    "channel_label": "Reddit"
+  }
+}

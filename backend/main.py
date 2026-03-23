@@ -694,7 +694,12 @@ Ask questions ONE AT A TIME in a natural conversation. Cover these areas:
 5. What should be ignored — what looks relevant but isn't?
 6. Who is sending the outreach — name, title, company?
 
-Once you have enough detail (usually 5-7 exchanges), respond with ONLY this JSON block (nothing before or after):
+Once you have enough detail (usually 5-7 exchanges), respond with ONLY the JSON block shown below — nothing before or after it.
+
+CRITICAL RULE: If the user says ANYTHING like "go ahead", "generate", "done", "create it", "proceed", "looks good",
+"that's enough", "force generate", or sends [FORCE_GENERATE] — you MUST immediately output the <CONFIG>...</CONFIG>
+block below with sensible defaults for anything not yet discussed. NEVER respond with prose in these cases.
+Do NOT ask another question. Do NOT summarise. Output the block ONLY.
 
 <CONFIG>
 {
@@ -766,12 +771,72 @@ Example for DTC/consumer brands: ["instagram", "facebook", "reddit", "google"]
     history.append({"role": "assistant", "content": opening_text})
     await ws.send_text(json.dumps({"type": "agent", "content": opening_text}))
 
+    FORCE_TRIGGER_WORDS = {"[force_generate]"}
+
+    async def _save_cfg(raw_json: str):
+        """Parse, persist, and broadcast the config. Returns cfg dict or raises."""
+        cfg = json.loads(raw_json)
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        await ws.send_text(json.dumps({"type": "config_ready", "content": cfg}))
+        return cfg
+
+    async def _force_generate():
+        """Keep asking the LLM until it produces valid JSON (up to 3 attempts)."""
+        force_prompt = (
+            "Generate the complete configuration JSON right now. "
+            "Use sensible defaults for any fields not yet discussed. "
+            "Output ONLY the <CONFIG>...</CONFIG> block — no other text."
+        )
+        for attempt in range(3):
+            h = list(history)
+            h.append({"role": "user", "content": force_prompt})
+            gen_reply = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: ollama_chat(h, SYSTEM)
+            )
+            history.append({"role": "user",      "content": force_prompt})
+            history.append({"role": "assistant", "content": gen_reply})
+
+            if "<CONFIG>" in gen_reply and "</CONFIG>" in gen_reply:
+                raw_cfg = gen_reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    await _save_cfg(raw_cfg)
+                    return True
+                except json.JSONDecodeError as e:
+                    force_prompt = (
+                        f"Syntax error in your JSON: {e}. "
+                        "Output ONLY the corrected <CONFIG>...</CONFIG> block."
+                    )
+                    continue
+            # LLM replied in prose again — push harder next loop
+            force_prompt = (
+                "You must output the <CONFIG>...</CONFIG> block NOW. "
+                "No explanations, no questions — just the JSON block."
+            )
+        # All attempts failed
+        await ws.send_text(json.dumps({
+            "type": "agent",
+            "content": (
+                "I'm having trouble generating the config automatically. "
+                "Please click 'Set up manually' to fill in the details directly."
+            ),
+        }))
+        return False
+
     try:
         while True:
             raw = await ws.receive_text()
             msg = json.loads(raw)
             user_text = msg.get("content", "").strip()
+            force = msg.get("force", False)
             if not user_text:
+                continue
+
+            # Force-generate path: skip normal LLM reply, go straight to config generation
+            if force or any(t in user_text.lower() for t in FORCE_TRIGGER_WORDS):
+                history.append({"role": "user", "content": user_text})
+                await _force_generate()
                 continue
 
             history.append({"role": "user", "content": user_text})
@@ -784,16 +849,10 @@ Example for DTC/consumer brands: ["instagram", "facebook", "reddit", "google"]
             if "<CONFIG>" in reply and "</CONFIG>" in reply:
                 raw_cfg = reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
                 try:
-                    cfg = json.loads(raw_cfg)
-                    cfg_path.parent.mkdir(parents=True, exist_ok=True)
-                    with open(cfg_path, "w") as f:
-                        json.dump(cfg, f, indent=2)
-                    await ws.send_text(json.dumps({"type": "config_ready", "content": cfg}))
-                except json.JSONDecodeError as e:
-                    await ws.send_text(json.dumps({
-                        "type": "agent",
-                        "content": f"I had a problem generating the config ({e}). Let me try again — can you confirm the key details?"
-                    }))
+                    await _save_cfg(raw_cfg)
+                except json.JSONDecodeError:
+                    # JSON malformed — hand off to the force-generate retry loop
+                    await _force_generate()
             else:
                 await ws.send_text(json.dumps({"type": "agent", "content": reply}))
 
@@ -1012,11 +1071,32 @@ The values above are the DEFAULTS. Only edit the fields the user's feedback requ
                     with open(cfg_path, "w") as f:
                         json.dump(new_cfg, f, indent=2)
                     await ws.send_text(json.dumps({"type": "config_ready", "content": new_cfg}))
-                except json.JSONDecodeError as e:
-                    await ws.send_text(json.dumps({
-                        "type": "agent",
-                        "content": f"I had trouble parsing the revised config ({e}). Please try rephrasing your feedback.",
-                    }))
+                except json.JSONDecodeError as parse_err:
+                    # Auto-retry: ask the LLM to fix its own malformed JSON
+                    fix_prompt = (
+                        f"The JSON you produced has a syntax error: {parse_err}. "
+                        "Please output ONLY the corrected JSON between <CONFIG> and </CONFIG> tags — "
+                        "no other text, no markdown fences."
+                    )
+                    history.append({"role": "user", "content": fix_prompt})
+                    retry_reply = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: ollama_chat(history, SYSTEM)
+                    )
+                    history.append({"role": "assistant", "content": retry_reply})
+                    if "<CONFIG>" in retry_reply and "</CONFIG>" in retry_reply:
+                        raw_cfg2 = retry_reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                        try:
+                            new_cfg = json.loads(raw_cfg2)
+                            with open(cfg_path, "w") as f:
+                                json.dump(new_cfg, f, indent=2)
+                            await ws.send_text(json.dumps({"type": "config_ready", "content": new_cfg}))
+                        except json.JSONDecodeError:
+                            await ws.send_text(json.dumps({
+                                "type": "agent",
+                                "content": "I'm having repeated trouble generating valid JSON. Please try rephrasing your feedback.",
+                            }))
+                    else:
+                        await ws.send_text(json.dumps({"type": "agent", "content": retry_reply}))
             else:
                 await ws.send_text(json.dumps({"type": "agent", "content": reply}))
 

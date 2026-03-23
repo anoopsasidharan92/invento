@@ -1,0 +1,198 @@
+{
+  "c5edd6d075": {
+    "company_name": "FMCG Ltd.",
+    "category": "FMCG",
+    "country": "India|Southeast Asia",
+    "fit_score": 6,
+    "fit_reason": "Indirect signal: company name mentions FMCG, but no specific industry terms or signals found",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Growing Your FMCG Business with Expert Guidance",
+      "body": "Hi FMCG Ltd., I saw that your company is involved in fast moving consumer goods. Our supply chain solutions company, Pollen Tech, specializes in inventory recovery and management for FMCG brands like yours. We'd love to discuss how we can help you grow your business.",
+      "from": "Rahul Kumar, CEO at Pollen Tech"
+    },
+    "source_url": "https://www.linkedin.com/company/fmcg-ltd-",
+    "signal_type": null,
+    "raw_snippet": "snippet not found for FMCG Ltd.",
+    "id": "c5edd6d075",
+    "found_at": "2026-03-22T12:48:48.002191",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "adc75327ee": {
+    "company_name": "FMCG Industry Solutions Pty Ltd",
+    "category": "FMCG|Supply Chain|Enterprise",
+    "country": "Australia",
+    "fit_score": 4,
+    "fit_reason": "Company is in the FMCG industry, which aligns with our target market.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Recovering FMCG Inventory: A Strategic Partnership?",
+      "body": "Hi FMCG Industry Solutions Pty Ltd team,\n\nI saw that your company is in the food and beverage manufacturing industry, which aligns with our target market. Our AI-powered liquidation management system, Lily AI, can help you recover up to 5% of annual revenue from aging inventory.\n\nBest regards,\nRahul Kumar, CEO at Pollen Tech"
+    },
+    "source_url": "https://au.linkedin.com/company/fmcgis.com.au",
+    "signal_type": "company_industry|company_size",
+    "raw_snippet": "Website: http://www.fmcgis.com.au. External link for FMCG Industry Solutions Pty Ltd ; Industry: Food and Beverage Manufacturing ; Company size: 2-10 employees.",
+    "id": "adc75327ee",
+    "found_at": "2026-03-22T12:49:24.198575",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "33ef510862": {
+    "company_name": "Supply2Flow",
+    "category": "FMCG|Supply Chain",
+    "country": "India",
+    "fit_score": 7,
+    "fit_reason": "Signal of interest in inventory recovery, mentions value recovery, and implies a proactive approach.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Value Recovery Expertise for FMCG Inventory",
+      "body": "Hi Supply2Flow team, I saw that you're thinking about value recovery. Our AI-powered system, Lily AI, helps FMCG brands recover up to 5% of annual revenue from aging inventory. Would love to discuss how we can help.",
+      "from": "Rahul Kumar",
+      "company": "Pollen Tech"
+    },
+    "source_url": "https://www.linkedin.com/company/supply2flow",
+    "signal_type": "",
+    "raw_snippet": "snippet text",
+    "id": "33ef510862",
+    "found_at": "2026-03-22T12:54:22.391592",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "39d2fab7f9": {
+    "company_name": "Quantum Services",
+    "category": "Supply Chain|Audit Firm",
+    "country": "Australia",
+    "fit_score": 4,
+    "fit_reason": "Signal: inventory loss reduction goal (35%) is relevant to FMCG inventory recovery, but lack of specific industry or FMCG term, weak signal",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Optimize FMCG Inventory Recovery with Expert Guidance",
+      "body": "Hi Tim Campbell, I saw that Quantum Services aims to reduce inventory loss by 35%. As an enterprise FMCG brand in Southeast Asia/India, you may benefit from our AI-powered liquidation management system, Lily AI. We help brands recover up to 5% of annual revenue from aging inventory. Would you like to explore how our solutions can support your business?",
+      "from": "Rahul Kumar, CEO at Pollen Tech"
+    },
+    "source_url": "https://www.linkedin.com/company/quantumservicesauditingfirm",
+    "signal_type": "",
+    "raw_snippet": "If you're ready to cut shrink and inventory loss by 35%,...",
+    "id": "39d2fab7f9",
+    "found_at": "2026-03-22T13:23:10.664366",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "767fc1f70f": {
+    "company_name": "Telaid Industries, Inc.",
+    "category": "FMCG|Supply Chain|Enterprise",
+    "country": "India",
+    "fit_score": 8,
+    "fit_reason": "Specific signal of 'inventory loss' impacting margin and visibility found in the snippet.",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Addressing Inventory Loss Challenges at Telaid Industries, Inc.",
+      "body": "Hi Rahul Kumar, CEO at Pollen Tech. I saw that Telaid Industries, Inc. is facing inventory loss impacting margin and visibility. Our AI-powered liquidation management system, Lily AI, can help recover up to 5% of annual revenue from aging inventory. I'd love to discuss how our solutions can address their specific challenges.",
+      "from": "Rahul Kumar <ceo@pollentech.com>"
+    },
+    "source_url": "https://ao.linkedin.com/company/telaid",
+    "signal_type": "inventory_loss",
+    "id": "767fc1f70f",
+    "found_at": "2026-03-22T13:23:35.755020",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "3505446553": {
+    "company_name": "Bay Cities",
+    "category": "FMCG|Supply Chain|Enterprise",
+    "country": "India",
+    "fit_score": 4,
+    "fit_reason": "Generic industry terms 'Retail Shrink' and 'Retail Strategy', but no direct signal to inventory recovery or management.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Improving Retail Compliance with AI-Powered Solutions",
+      "body": "Hi Bay Cities team, I saw that your company is focusing on improving retail compliance. At Pollen Tech, we specialize in helping FMCG brands like yours reduce inventory losses and improve execution through our AI-powered liquidation management system, Lily AI."
+    },
+    "source_url": "https://www.linkedin.com/company/bay-cities",
+    "signal_type": null,
+    "raw_snippet": "... inventory loss, improves execution compliance, and minimizes retail labor during mod sets.",
+    "id": "3505446553",
+    "found_at": "2026-03-22T13:24:53.328194",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "80c77f358e": {
+    "company_name": "",
+    "category": "FMCG|Industry News",
+    "country": "Global",
+    "fit_score": 4,
+    "fit_reason": "The snippet mentions the FMCG industry growth rate (5.1%) and CAGR for the inhouse segment (5.0%), indicating a potential interest in supply chain management or inventory recovery strategies.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Growing Demand for Supply Chain Solutions in FMCG Industry",
+      "body": "Hi [Recipient], I saw that you wrote about the growing CAGR of the inhouse segment in the FMCG industry. As a company specializing in supply chain solutions for FMCG companies, we believe our expertise can help optimize inventory recovery and management.",
+      "name": "",
+      "email": ""
+    },
+    "source_url": "https://natlawreview.com/press-releases/fmcg-industry-size-worth-usd-189394-billion-2031-growth-rate-cagr-51",
+    "signal_type": "",
+    "raw_snippet": "based on production type, the inhouse segment is the highest revenue contributor",
+    "id": "80c77f358e",
+    "found_at": "2026-03-22T13:27:24.745429",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "f99b42f772": {
+    "company_name": "FreezPak Logistics",
+    "category": "Logistics|Supply Chain",
+    "country": "USA|Massachusetts",
+    "fit_score": 4,
+    "fit_reason": "Location (Boston area) indicates potential for FMCG logistics expertise, indirect signal matching ICP category",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Unlock Efficient FMCG Logistics with Our Expertise",
+      "body": "Hi FreezPak Team, I saw that you're expanding to serve the Boston area. As an enterprise FMCG brand operating in Southeast Asia and India, we need reliable logistics solutions. Our AI-powered liquidation management system can help recover up to 5% of our annual revenue from aging inventory. Let's discuss how Pollen Tech can support your business. Best regards, Rahul Kumar",
+      "from": "Rahul Kumar, CEO at Pollen Tech"
+    },
+    "source_url": "https://fallriverreporter.com/freezpak-logistics-announces-opening-of-state-of-the-art-facility-in-fall-river-designed-to-serve-boston-area-new-england/",
+    "signal_type": null,
+    "raw_snippet": "FALL RIVER/BOSTON \u2013 FreezPak Logistics, prominent in temperature-controlled logistics solutions...",
+    "id": "f99b42f772",
+    "found_at": "2026-03-22T13:40:52.869883",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "6a9bb7c403": {
+    "company_name": "Camping World",
+    "category": "FMCG|Supply Chain",
+    "country": "United States",
+    "fit_score": 8,
+    "fit_reason": "Average lead time for inventory delivery exceeding 60 days, as implied by 'inventory management issues', matching our ICP's supply chain needs.",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Camping World's Inventory Management Concerns: How Pollen Tech Can Help",
+      "body": "Dear [Name], I saw that Camping World faces securities fraud allegations for misrepresenting its inventory management, causing a 24% single day stock drop. As a company specializing in FMCG supply chain solutions, we're familiar with the risks of poor inventory management. We can help you recover from such issues and prevent future write-offs.",
+      "from": "Rahul Kumar, CEO at Pollen Tech"
+    },
+    "source_url": "https://www.prnewswire.com/news-releases/cwh-lawsuit-alert-camping-world-inventory-management-issues-triggers-securities-class-action-after-stock-drops-24-302718226.html",
+    "signal_type": "average_lead_time|inventory_write_off|misrepresentation",
+    "id": "6a9bb7c403",
+    "found_at": "2026-03-22T13:43:24.393328",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  }
+}

@@ -16,27 +16,6 @@
     "Made-to-order only manufacturers",
     "Premium or high-margin positioning"
   ],
-  "result_schema": {
-    "lead_name_field": "company_name",
-    "categories": [
-      "Textile manufacturer",
-      "Wholesaler",
-      "Exporter"
-    ],
-    "geographies": [
-      "India",
-      "Export hubs like Surat, Mumbai, and Jaipur"
-    ],
-    "signal_types": [
-      "Sungudi_cotton_wholesaler",
-      "Sungudi_exporter"
-    ]
-  },
-  "score_thresholds": {
-    "hot_min": 8,
-    "warm_min": 5,
-    "save_min": 4
-  },
   "search_queries": [
     {
       "signal": "Sungudi_cotton_wholesaler",
@@ -56,8 +35,33 @@
   "search_channels": [
     "linkedin",
     "news",
-    "google"
+    "google",
+    "reddit",
+    "instagram",
+    "facebook"
   ],
-  "max_results_per_query": 5,
-  "search_geo": "in"
+  "search_geo": "in",
+  "max_results_per_query": 14,
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "Textile manufacturer",
+      "Wholesaler",
+      "Exporter"
+    ],
+    "geographies": [
+      "India",
+      "Export hubs like Surat, Mumbai, and Jaipur"
+    ],
+    "signal_types": [
+      "Sungudi_cotton_wholesaler",
+      "Sungudi_exporter"
+    ]
+  },
+  "batch_size": 0
 }
