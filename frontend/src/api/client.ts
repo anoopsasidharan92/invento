@@ -22,7 +22,7 @@ export interface UploadResponse {
 export type Mapping = Record<string, string>;
 
 export interface WSIncomingMessage {
-  type: "agent" | "mapping" | "preview" | "done" | "error" | "progress";
+  type: "agent" | "mapping" | "preview" | "done" | "error" | "progress" | "thinking";
   content: unknown;
 }
 

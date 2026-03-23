@@ -1284,6 +1284,16 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                 ))
                 await ws_progress(websocket, "Analyzing file structure...")
 
+                # Thinking: show reasoning about file structure
+                headers = sheet_info["headers"]
+                row_count = sheet_info["row_count"]
+                thinking_lines = [
+                    f"File has {len(headers)} columns and {row_count} rows.",
+                    f"Columns detected: {', '.join(headers[:12])}{'...' if len(headers) > 12 else ''}.",
+                    f"Checking if this is a product inventory with identifiable fields (SKU, name, price, qty, barcode).",
+                ]
+                await ws_send(websocket, "thinking", "\n".join(thinking_lines))
+
                 # Step 1: file analysis
                 analysis = await agent.analyze_file(sheet_info, meta, session.sheet_name)
                 await ws_send(websocket, "agent", analysis)
@@ -1325,6 +1335,11 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                     )
 
                 # Step 1.2: inventory feasibility gate
+                await ws_send(websocket, "thinking",
+                    "Assessing whether this sheet is a valid inventory file. "
+                    "Looking for product-like columns (SKU, name, quantity, price, barcode) "
+                    "and checking data patterns against known inventory formats."
+                )
                 is_inventory, reason, feasibility_conf = await agent.assess_inventory_feasibility(sheet_info)
                 if not is_inventory:
                     await ws_send(
@@ -1374,6 +1389,13 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                     await ws_progress(websocket, "Unpivot complete", active=False)
 
                 # Step 2: column mapping (primary + secondary)
+                await ws_send(websocket, "thinking",
+                    "Starting column mapping. Will first identify primary fields "
+                    "(product description, unit size, price, barcode, origin) then secondary fields "
+                    "(shipping weight, dimensions, dates, warehouse). "
+                    f"Analyzing {len(sheet_info['headers'])} columns against known field patterns "
+                    "and sample data values."
+                )
                 await ws_send(websocket, "agent",
                     "Mapping primary fields (product identity, pricing) and secondary fields (shipping, dates)...")
                 await ws_progress(websocket, "Running AI field mapping...")
@@ -1687,11 +1709,6 @@ def _save_output(file_id: str, df: pd.DataFrame) -> tuple[str, List[str]]:
 
 
 async def _send_preview(websocket: WebSocket, file_id: str, df: pd.DataFrame):
-    ordered_cols = [c for c in OUTPUT_COLUMN_ORDER if c in df.columns]
-    rename_map = {k: NICE_COLUMN_NAMES.get(k, k) for k in ordered_cols}
-    df_output = df[ordered_cols].rename(columns=rename_map)
-    preview_rows = df_output.head(20).fillna("").to_dict(orient="records")
-
     # Determine whether units_per_carton has real data in the df
     upc_col = "units_per_carton"
     upc_mapped = (
@@ -1704,6 +1721,15 @@ async def _send_preview(websocket: WebSocket, file_id: str, df: pd.DataFrame):
         tc_col in df.columns
         and df[tc_col].replace("", pd.NA).dropna().shape[0] > 0
     )
+
+    # Ensure units_per_carton column exists so the editable input renders
+    if total_carton_mapped and not upc_mapped and upc_col not in df.columns:
+        df[upc_col] = ""
+
+    ordered_cols = [c for c in OUTPUT_COLUMN_ORDER if c in df.columns]
+    rename_map = {k: NICE_COLUMN_NAMES.get(k, k) for k in ordered_cols}
+    df_output = df[ordered_cols].rename(columns=rename_map)
+    preview_rows = df_output.head(20).fillna("").to_dict(orient="records")
 
     await ws_send(websocket, "preview", {
         "columns": list(df_output.columns),

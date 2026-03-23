@@ -1,5 +1,5 @@
-import { useEffect, useRef } from "react";
-import { Bot, AlertCircle, ArrowRight } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Bot, AlertCircle, ArrowRight, ChevronDown, ChevronRight, Brain } from "lucide-react";
 import {
   MappingContent,
   PreviewContent,
@@ -14,6 +14,7 @@ export interface ChatMessage {
   id: string;
   role: MessageRole;
   text?: string;
+  thinkingText?: string;
   mappingContent?: MappingContent;
   previewContent?: PreviewContent;
   doneContent?: DoneContent;
@@ -32,6 +33,30 @@ function renderMarkdown(text: string) {
     .replace(/\n/g, "<br />");
 }
 
+function ThinkingBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <button
+      onClick={() => setExpanded((e) => !e)}
+      className="w-full text-left group"
+    >
+      <div className="flex items-center gap-1.5 text-[12px] font-medium text-violet-500">
+        <Brain className="w-3 h-3" />
+        <span>Thinking</span>
+        {expanded
+          ? <ChevronDown className="w-3 h-3 ml-auto opacity-60" />
+          : <ChevronRight className="w-3 h-3 ml-auto opacity-60" />}
+      </div>
+      {expanded && (
+        <div
+          className="mt-1.5 text-[13px] leading-relaxed text-ui-accent whitespace-pre-line border-l-2 border-violet-200 pl-3"
+          dangerouslySetInnerHTML={{ __html: renderMarkdown(text) }}
+        />
+      )}
+    </button>
+  );
+}
+
 export default function ChatWindow({ messages, thinking }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -46,10 +71,11 @@ export default function ChatWindow({ messages, thinking }: Props) {
         const isError = msg.role === "error";
 
         const hasText = !!msg.text;
+        const hasThinking = !!msg.thinkingText;
         const hasMapping = !!msg.mappingContent;
         const hasPreview = !!msg.previewContent;
 
-        if (!hasText && !hasMapping && !hasPreview) return null;
+        if (!hasText && !hasThinking && !hasMapping && !hasPreview) return null;
 
         return (
           <div
@@ -69,6 +95,12 @@ export default function ChatWindow({ messages, thinking }: Props) {
               <span className="text-[11px] text-ui-accent px-1">
                 {isAgent || isError ? "AI" : "You"}
               </span>
+
+              {hasThinking && (
+                <div className="bg-violet-50/60 border border-violet-100 rounded-xl px-4 py-2.5 shadow-sm max-w-md">
+                  <ThinkingBlock text={msg.thinkingText!} />
+                </div>
+              )}
 
               {hasText && (
                 <div className={[

@@ -52,6 +52,9 @@ export default function InventoryTool() {
   const handleWSMessage = useCallback(
     (msg: WSIncomingMessage) => {
       switch (msg.type) {
+        case "thinking":
+          pushMessage({ id: newId(), role: "agent", thinkingText: msg.content as string });
+          break;
         case "agent":
           setThinking(false);
           pushMessage({ id: newId(), role: "agent", text: msg.content as string });
