@@ -7,9 +7,10 @@ const PAGE_SIZE = 10;
 const NICE_TO_FIELD: Record<string, string> = {
   "Category": "category",
   "Sub Category": "sub_category",
+  "Brand": "brand",
 };
 
-const EDITABLE_COLUMNS = new Set(["Category", "Sub Category"]);
+const EDITABLE_COLUMNS = new Set(["Category", "Sub Category", "Brand"]);
 
 interface Props {
   preview: PreviewContent;
@@ -105,7 +106,10 @@ export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props)
   const renderCell = (row: Record<string, string>, pageRowIdx: number, col: string) => {
     const absoluteIdx = page * PAGE_SIZE + pageRowIdx;
     const value = String(row[col] ?? "");
-    const isEditable = EDITABLE_COLUMNS.has(col) && !!onCellEdit && categories.length > 0;
+    const isEditable =
+      !!onCellEdit &&
+      EDITABLE_COLUMNS.has(col) &&
+      (col === "Brand" || categories.length > 0);
     const isEditing =
       editing?.rowIdx === absoluteIdx && editing?.col === col;
 
@@ -146,6 +150,27 @@ export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props)
             All
           </button>
         </div>
+      );
+    }
+
+    if (isEditing && col === "Brand") {
+      return (
+        <input
+          type="text"
+          autoFocus
+          className="w-full min-w-[120px] max-w-[220px] bg-white text-ui-text text-xs rounded px-1.5 py-0.5 outline-none border border-ui-border"
+          defaultValue={value}
+          onBlur={(e) => {
+            handleSelect(absoluteIdx, col, e.target.value.trim());
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              const v = (e.target as HTMLInputElement).value.trim();
+              handleSelect(absoluteIdx, col, v);
+              (e.target as HTMLInputElement).blur();
+            }
+          }}
+        />
       );
     }
 
@@ -226,9 +251,9 @@ export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props)
         <span className="text-xs text-ui-accent ml-1">
           ({preview.total_rows.toLocaleString()} total rows)
         </span>
-        {categories.length > 0 && (
+        {!!onCellEdit && (categories.length > 0 || preview.columns.includes("Brand")) && (
           <span className="text-[10px] text-gray-500 ml-1 border border-ui-border rounded px-1.5 py-0.5">
-            Click Category / Sub Category to edit
+            Click Category / Sub Category / Brand to edit
           </span>
         )}
         {showUpcInput && (
@@ -256,7 +281,7 @@ export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props)
                   className="px-4 py-3 text-left font-medium text-gray-500 whitespace-nowrap"
                 >
                   {col}
-                  {EDITABLE_COLUMNS.has(col) && categories.length > 0 && (
+                  {EDITABLE_COLUMNS.has(col) && (col === "Brand" || categories.length > 0) && (
                     <Pencil className="w-2.5 h-2.5 inline ml-1 opacity-40" />
                   )}
                   {col === "Units Per Carton" && showUpcInput && (

@@ -239,15 +239,16 @@ Enrichment context (business/account level — use as a secondary hint only, NEV
 Return ONLY valid JSON in this exact shape:
 {{
   "results": [
-    {{"row_id": 0, "category": "FMCG - Food & Beverage", "sub_category": "Beverages", "confidence": 0.95}},
-    {{"row_id": 1, "category": "Fashion & Apparel", "sub_category": "Footwear", "confidence": 0.91}},
-    {{"row_id": 2, "category": "FMCG - Personal Care", "sub_category": "Shampoo", "confidence": 0.88}}
+    {{"row_id": 0, "category": "FMCG - Food & Beverage", "sub_category": "Beverages", "brand": "Coca-Cola", "confidence": 0.95}},
+    {{"row_id": 1, "category": "Fashion & Apparel", "sub_category": "Footwear", "brand": "Nike", "confidence": 0.91}},
+    {{"row_id": 2, "category": "FMCG - Personal Care", "sub_category": "Shampoo", "brand": "L'Oreal", "confidence": 0.88}}
   ]
 }}
 
 Rules:
 - Keep row_id exactly as provided.
 - confidence must be 0..1.
+- **brand**: Manufacturer or brand name for the product line (not the distributor). Use the **brand** field from the row if it is already correct; if it is blank or clearly wrong, infer from product_name, SKU, and remarks. Use Title Case where appropriate. Use "" only if you cannot infer a brand.
 - ALWAYS classify based on what the product actually is (from product_name, brand, description).
 - Do NOT let business context override clear product evidence.
   e.g. a beverage is ALWAYS "FMCG - Food & Beverage" even if the seller mainly sells cosmetics.
@@ -743,10 +744,11 @@ def _validate_classification(cat: str, sub: str, conf: float, row_payload: Dict[
 
 async def classify_rows_enriched(
     rows: List[Dict[str, str]], context: Optional[Dict[str, str]] = None
-) -> List[Tuple[str, str, float]]:
+) -> List[Tuple[str, str, float, str]]:
     """
     LLM-first enrichment classification for a row batch.
-    Returns list of (category, sub_category, confidence) in input order.
+    Returns list of (category, sub_category, confidence, brand) in input order.
+    The brand value is intended to fill missing brand cells; callers may ignore it when brand is already set.
     """
     if not rows:
         return []
@@ -785,7 +787,7 @@ async def classify_rows_enriched(
         parsed = _extract_json(raw)
         results = parsed.get("results", [])
 
-        by_id: Dict[int, Tuple[str, str, float]] = {}
+        by_id: Dict[int, Tuple[str, str, float, str]] = {}
         for r in results:
             if not isinstance(r, dict):
                 continue
@@ -795,6 +797,7 @@ async def classify_rows_enriched(
             cat = str(r.get("category", "Other"))
             sub = str(r.get("sub_category", "Other"))
             conf = float(r.get("confidence", 0.6))
+            brand_guess = str(r.get("brand", "")).strip()
             if cat not in CATEGORY_TAXONOMY:
                 cat, sub = _heuristic_category_from_text(
                     " ".join(
@@ -809,9 +812,12 @@ async def classify_rows_enriched(
                 conf = min(conf, 0.7)
             cat, sub, conf = _apply_context_bias(cat, sub, conf, payload[row_id], context)
             cat, sub, conf = _validate_classification(cat, sub, conf, payload[row_id])
-            by_id[row_id] = (cat, sub, max(0.0, min(1.0, round(conf, 2))))
+            hint = context.get("brand_hint", "") if context else ""
+            if not brand_guess and hint:
+                brand_guess = str(hint).strip()
+            by_id[row_id] = (cat, sub, max(0.0, min(1.0, round(conf, 2))), brand_guess)
 
-        output: List[Tuple[str, str, float]] = []
+        output: List[Tuple[str, str, float, str]] = []
         for i, row in enumerate(payload):
             if i in by_id:
                 output.append(by_id[i])
@@ -828,10 +834,12 @@ async def classify_rows_enriched(
                 )
                 cat, sub, conf = _apply_context_bias(cat, sub, 0.55, row, context)
                 cat, sub, conf = _validate_classification(cat, sub, conf, row)
-                output.append((cat, sub, conf))
+                hint = context.get("brand_hint", "") if context else ""
+                b = str(row.get("brand", "")).strip() or (str(hint).strip() if hint else "")
+                output.append((cat, sub, conf, b))
         return output
     except Exception:
-        fallback: List[Tuple[str, str, float]] = []
+        fallback: List[Tuple[str, str, float, str]] = []
         for row in payload:
             cat, sub = _heuristic_category_from_text(
                 " ".join(
@@ -844,7 +852,10 @@ async def classify_rows_enriched(
                 )
             )
             cat, sub, conf = _apply_context_bias(cat, sub, 0.55, row, context)
-            fallback.append((cat, sub, conf))
+            cat, sub, conf = _validate_classification(cat, sub, conf, row)
+            hint = context.get("brand_hint", "") if context else ""
+            b = str(row.get("brand", "")).strip() or (str(hint).strip() if hint else "")
+            fallback.append((cat, sub, conf, b))
         return fallback
 
 

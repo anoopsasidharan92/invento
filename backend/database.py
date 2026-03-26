@@ -56,16 +56,38 @@ def get_db():
 def save_inventory(db, session_id: str, filename: str, file_type: str,
                    sheet_name: str, mapping: Dict, rows: List[Dict],
                    output_path: str) -> InventorySession:
-    session_record = InventorySession(
-        session_id=session_id,
-        original_filename=filename,
-        file_type=file_type,
-        sheet_name=sheet_name,
-        column_mapping=json.dumps(mapping),
-        row_count=len(rows),
-        output_path=output_path,
+    """
+    Persist normalized inventory for a session. If the session_id already exists
+    (e.g. mapping confirmed again in the same chat), update the session row and
+    replace stored rows instead of inserting a duplicate.
+    """
+    existing = (
+        db.query(InventorySession)
+        .filter(InventorySession.session_id == session_id)
+        .first()
     )
-    db.add(session_record)
+    if existing:
+        db.query(InventoryRow).filter(InventoryRow.session_id == session_id).delete(
+            synchronize_session=False
+        )
+        existing.original_filename = filename
+        existing.file_type = file_type
+        existing.sheet_name = sheet_name
+        existing.column_mapping = json.dumps(mapping)
+        existing.row_count = len(rows)
+        existing.output_path = output_path
+        session_record = existing
+    else:
+        session_record = InventorySession(
+            session_id=session_id,
+            original_filename=filename,
+            file_type=file_type,
+            sheet_name=sheet_name,
+            column_mapping=json.dumps(mapping),
+            row_count=len(rows),
+            output_path=output_path,
+        )
+        db.add(session_record)
 
     for row in rows:
         db.add(InventoryRow(

@@ -8,7 +8,7 @@ import subprocess
 import sys
 import uuid
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import aiofiles
 import pandas as pd
@@ -214,6 +214,14 @@ async def download_clean_template_file(file_id: str):
     path = OUTPUT_DIR / f"{file_id}_clean_template.csv"
     if not path.exists():
         raise HTTPException(404, "No clean template output file found for this session.")
+    return FileResponse(str(path), media_type="text/csv", filename=path.name)
+
+
+@app.get("/download/{file_id}/b2b-marketplace")
+async def download_b2b_marketplace_file(file_id: str):
+    path = OUTPUT_DIR / f"{file_id}_b2b_marketplace.csv"
+    if not path.exists():
+        raise HTTPException(404, "No B2B marketplace export found for this session.")
     return FileResponse(str(path), media_type="text/csv", filename=path.name)
 
 
@@ -1190,6 +1198,142 @@ CLEAN_TEMPLATE_NICE_COLUMN_NAMES = {
     "other_notes": "Other Notes",
 }
 
+# Cleaned B2B marketplace export — fixed 24-column layout for marketplace uploads.
+B2B_MARKETPLACE_HEADERS: List[str] = [
+    "SKU",
+    "Variant Name",
+    "Quantity",
+    "Units Per Carton",
+    "Total Carton",
+    "Unit Size",
+    "Unit Size Measurement",
+    "Brand",
+    "Category",
+    "Sub-Category",
+    "Best Price (USD)",
+    "Asking Price (USD)",
+    "Local Currency",
+    "Best Price (Local)",
+    "Asking Price (Local)",
+    "Discount",
+    "Warehouse",
+    "Shelf Life (Days)",
+    "Image URL",
+    "Barcode",
+    "Barcode Type",
+    "Batch ID",
+    "Expiry Date (YYYY-MM-DD)",
+    "Remarks",
+]
+
+
+def _split_unit_size_measurement(raw) -> Tuple[str, str]:
+    """Split a unit_size cell into numeric size and measurement (e.g. '500 ml' → '500', 'ml')."""
+    if raw is None:
+        return "", ""
+    try:
+        if pd.isna(raw):
+            return "", ""
+    except (TypeError, ValueError):
+        pass
+    s = str(raw).strip()
+    if not s or s.lower() == "nan":
+        return "", ""
+    m = re.match(r"^([\d.,]+)\s*([^\d].*)?$", s)
+    if m:
+        num, rest = m.group(1), (m.group(2) or "").strip()
+        if rest:
+            return num, rest
+        return num, ""
+    compact = s.replace(" ", "")
+    m2 = re.match(r"^([\d.,]+)([a-zA-Z][a-zA-Z0-9]*)$", compact)
+    if m2:
+        return m2.group(1), m2.group(2)
+    return s, ""
+
+
+def _b2b_variant_name(row: pd.Series) -> str:
+    parts: List[str] = []
+    pn = row.get("product_name", "")
+    if pd.notna(pn) and str(pn).strip():
+        parts.append(str(pn).strip())
+    color = row.get("color", "")
+    if pd.notna(color) and str(color).strip():
+        c = str(color).strip()
+        if not parts or c.lower() not in parts[0].lower():
+            parts.append(c)
+    gender = row.get("gender", "")
+    if pd.notna(gender) and str(gender).strip():
+        g = str(gender).strip()
+        merged = " ".join(parts).lower()
+        if g.lower() not in merged:
+            parts.append(g)
+    if not parts:
+        us = row.get("unit_size", "")
+        if pd.notna(us) and str(us).strip():
+            parts.append(str(us).strip())
+    return " / ".join(parts) if parts else ""
+
+
+def _b2b_remarks(row: pd.Series) -> str:
+    rem = row.get("remarks", "")
+    other = row.get("other_notes", "")
+    r = str(rem).strip() if pd.notna(rem) else ""
+    o = str(other).strip() if pd.notna(other) else ""
+    if r and o:
+        return f"{r}; {o}"
+    return r or o
+
+
+def dataframe_to_b2b_marketplace(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Map normalized inventory columns to the cleaned B2B marketplace CSV shape.
+    USD price columns are filled when Local Currency is USD; otherwise left blank.
+    """
+    work = df.copy()
+    for col in agent.ALL_FIELDS:
+        if col not in work.columns:
+            work[col] = ""
+
+    us_pairs = work["unit_size"].map(_split_unit_size_measurement)
+    unit_sz = us_pairs.map(lambda x: x[0])
+    unit_meas = us_pairs.map(lambda x: x[1])
+
+    curr = work["local_currency"].fillna("").astype(str).str.strip().str.upper()
+    is_usd = curr == "USD"
+    best_usd = work["retail_price_local"].where(is_usd, "")
+    ask_usd = work["asking_price_local"].where(is_usd, "")
+
+    out = pd.DataFrame(
+        {
+            "SKU": work["sku"].fillna(""),
+            "Variant Name": work.apply(_b2b_variant_name, axis=1),
+            "Quantity": work["quantity_in_units"].fillna(""),
+            "Units Per Carton": work["units_per_carton"].fillna(""),
+            "Total Carton": work["total_carton"].fillna(""),
+            "Unit Size": unit_sz,
+            "Unit Size Measurement": unit_meas,
+            "Brand": work["brand"].fillna(""),
+            "Category": work["category"].fillna(""),
+            "Sub-Category": work["sub_category"].fillna(""),
+            "Best Price (USD)": best_usd.fillna(""),
+            "Asking Price (USD)": ask_usd.fillna(""),
+            "Local Currency": work["local_currency"].fillna(""),
+            "Best Price (Local)": work["retail_price_local"].fillna(""),
+            "Asking Price (Local)": work["asking_price_local"].fillna(""),
+            "Discount": work["discount"].fillna(""),
+            "Warehouse": work["warehouse_location"].fillna(""),
+            "Shelf Life (Days)": "",
+            "Image URL": work["image_url"].fillna(""),
+            "Barcode": work["barcode"].fillna(""),
+            "Barcode Type": work["barcode_key"].fillna(""),
+            "Batch ID": work["batch_code"].fillna(""),
+            "Expiry Date (YYYY-MM-DD)": work["expiry_date"].fillna(""),
+            "Remarks": work.apply(_b2b_remarks, axis=1),
+        }
+    )
+    return out[B2B_MARKETPLACE_HEADERS]
+
 
 class ChatSession:
     def __init__(self):
@@ -1245,7 +1389,9 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
 
     await ws_send(websocket, "agent", (
         "Hello! I'm your Inventory Parser assistant. "
-        "Upload an Excel or CSV file and I'll map it to the standard output template."
+        "Upload an Excel or CSV file and I'll map it to the standard output template. "
+        "After your data is cleaned and normalized, you can download the **cleaned up B2B marketplace format** "
+        "(24 columns) from the download bar."
     ))
 
     try:
@@ -1487,13 +1633,13 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                     continue
                 if any(k in text_l for k in ["start enrichment", "enrich start", "run enrichment"]):
                     if not session.enrichment_needed:
-                        await ws_send(websocket, "agent", "Enrichment is not required for this file. Categories are already available.")
+                        await ws_send(websocket, "agent", "Enrichment is not required for this file — Category, Sub Category, and Brand are already filled.")
                         continue
                     await _run_enrichment_batch(websocket, session, first_batch=True)
                     continue
                 if any(k in text_l for k in ["enrich next", "next enrichment", "continue enrichment"]):
                     if not session.enrichment_needed:
-                        await ws_send(websocket, "agent", "Enrichment is not required for this file.")
+                        await ws_send(websocket, "agent", "Enrichment is not required — Category, Sub Category, and Brand are already filled.")
                         continue
                     await _run_enrichment_batch(websocket, session, first_batch=False)
                     continue
@@ -1535,10 +1681,12 @@ async def chat_endpoint(websocket: WebSocket, db: Session = Depends(get_db)):
                 if (
                     session.normalized_df is not None
                     and isinstance(row_idx, int)
-                    and field in ("category", "sub_category", "units_per_carton")
+                    and field in ("category", "sub_category", "brand", "units_per_carton")
                     and 0 <= row_idx < len(session.normalized_df)
                 ):
                     df = session.normalized_df
+                    if field == "brand" and "brand" not in df.columns:
+                        df["brand"] = ""
                     if field == "units_per_carton":
                         # Ensure column exists
                         if "units_per_carton" not in df.columns:
@@ -1620,6 +1768,8 @@ async def _apply_and_save(websocket: WebSocket, session: ChatSession, db: Sessio
         df["category"] = ""
     if "sub_category" not in df.columns:
         df["sub_category"] = ""
+    if "brand" not in df.columns:
+        df["brand"] = ""
 
     # Build enrichment context rows using mapped fields + source metadata fields
     source_df = pre_loaded.copy() if pre_loaded is not None else inv_parser.load_sheet_dataframe(filepath, session.sheet_name)
@@ -1667,13 +1817,15 @@ async def _apply_and_save(websocket: WebSocket, session: ChatSession, db: Sessio
     if session.enrichment_needed:
         await ws_send(websocket, "agent", (
             f"Done! Processed **{len(session.normalized_df)} rows** with **{len(ordered_cols)} output fields**. "
-            "Some Category/Sub Category values are missing. "
-            "Type **start enrichment** to run product-level taxonomy enrichment in batches."
+            "Some Category, Sub Category, or Brand values are missing. "
+            "Type **start enrichment** to run taxonomy and brand enrichment in batches. "
+            "Use **B2B Marketplace** in the download bar for the cleaned 24-column marketplace CSV."
         ))
     else:
         await ws_send(websocket, "agent", (
             f"Done! Processed **{len(session.normalized_df)} rows** with **{len(ordered_cols)} output fields**. "
-            "Category/Sub Category data is already available, so enrichment is not required."
+            "Category, Sub Category, and Brand are already filled, so enrichment is not required. "
+            "Use **B2B Marketplace** in the download bar for the cleaned 24-column marketplace CSV."
         ))
 
     await ws_send(websocket, "done", {
@@ -1704,6 +1856,10 @@ def _save_output(file_id: str, df: pd.DataFrame) -> tuple[str, List[str]]:
     clean_output = clean_df.rename(columns=clean_rename_map)
     clean_output_path = str(OUTPUT_DIR / f"{file_id}_clean_template.csv")
     clean_output.to_csv(clean_output_path, index=False)
+
+    b2b_df = dataframe_to_b2b_marketplace(df)
+    b2b_output_path = str(OUTPUT_DIR / f"{file_id}_b2b_marketplace.csv")
+    b2b_df.to_csv(b2b_output_path, index=False)
 
     return output_path, ordered_cols
 
@@ -1739,6 +1895,7 @@ async def _send_preview(websocket: WebSocket, file_id: str, df: pd.DataFrame):
         "taxonomy": CATEGORY_TAXONOMY,
         "units_per_carton_mapped": upc_mapped,
         "total_carton_mapped": total_carton_mapped,
+        "enrichment_needed": _is_enrichment_needed(df),
     })
 
 
@@ -1818,7 +1975,7 @@ async def _run_enrichment_batch(websocket: WebSocket, session: ChatSession, firs
             await ws_send(
                 websocket,
                 "agent",
-                "Before enrichment, please provide context so classification is accurate. "
+                "Before enrichment, please provide context so category and brand inference are accurate. "
                 "Example: **seller=<seller>; brand=<brand>; domain=<domain>; market=<country>**",
             )
             return
@@ -1845,21 +2002,28 @@ async def _run_enrichment_batch(websocket: WebSocket, session: ChatSession, firs
     cats: List[str] = []
     subs: List[str] = []
     confs: List[float] = []
-    for cat, sub, conf in enriched:
+    brands: List[str] = []
+    for cat, sub, conf, brand_guess in enriched:
         cats.append(cat)
         subs.append(sub)
         confs.append(conf)
+        brands.append(str(brand_guess or "").strip())
 
-    # Only fill rows where category/sub_category are blank.
+    # Only fill rows where category/sub_category/brand are blank.
+    if "brand" not in df.columns:
+        df["brand"] = ""
     slice_idx = range(start, end)
     cat_col_idx = df.columns.get_loc("category")
     sub_col_idx = df.columns.get_loc("sub_category")
+    brand_col_idx = df.columns.get_loc("brand")
     for j, idx in enumerate(slice_idx):
         # Use positional indexing to avoid KeyError when DataFrame index labels are non-consecutive.
         if str(df.iloc[idx, cat_col_idx]).strip() == "":
             df.iloc[idx, cat_col_idx] = cats[j]
         if str(df.iloc[idx, sub_col_idx]).strip() == "":
             df.iloc[idx, sub_col_idx] = subs[j]
+        if str(df.iloc[idx, brand_col_idx]).strip() == "" and brands[j]:
+            df.iloc[idx, brand_col_idx] = brands[j]
 
     session.normalized_df = df
     session.enrichment_cursor = end
@@ -1946,12 +2110,15 @@ def _has_sufficient_enrichment_context(ctx: Dict[str, str]) -> bool:
 
 
 def _is_enrichment_needed(df: pd.DataFrame) -> bool:
-    """Enrichment is needed only if category/sub-category has missing values."""
+    """Enrichment is needed if category, sub-category, or brand has missing values."""
     if "category" not in df.columns or "sub_category" not in df.columns:
         return True
     cat_missing = df["category"].fillna("").astype(str).str.strip().eq("").any()
     sub_missing = df["sub_category"].fillna("").astype(str).str.strip().eq("").any()
-    return bool(cat_missing or sub_missing)
+    if "brand" not in df.columns:
+        return True
+    brand_missing = df["brand"].fillna("").astype(str).str.strip().eq("").any()
+    return bool(cat_missing or sub_missing or brand_missing)
 
 
 def _load_context_memory() -> List[Dict[str, str]]:

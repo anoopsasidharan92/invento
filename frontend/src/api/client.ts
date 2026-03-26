@@ -45,6 +45,8 @@ export interface PreviewContent {
   taxonomy?: Taxonomy;
   units_per_carton_mapped?: boolean;
   total_carton_mapped?: boolean;
+  /** True if category, sub-category, or brand still has gaps (enrichment can help). */
+  enrichment_needed?: boolean;
 }
 
 export interface DoneContent {
@@ -81,6 +83,10 @@ export function getDownloadUrl(fileId: string): string {
 
 export function getCleanTemplateDownloadUrl(fileId: string): string {
   return `${API_BASE}/download/${fileId}/clean-template`;
+}
+
+export function getB2bMarketplaceDownloadUrl(fileId: string): string {
+  return `${API_BASE}/download/${fileId}/b2b-marketplace`;
 }
 
 // ─── WebSocket chat client ────────────────────────────────────────────────────

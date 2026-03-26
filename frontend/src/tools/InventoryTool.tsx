@@ -15,6 +15,7 @@ import {
   WSIncomingMessage,
   getDownloadUrl,
   getCleanTemplateDownloadUrl,
+  getB2bMarketplaceDownloadUrl,
 } from "../api/client";
 
 let msgCounter = 0;
@@ -67,6 +68,9 @@ export default function InventoryTool() {
           setThinking(false);
           pushMessage({ id: newId(), role: "agent", previewContent: msg.content as PreviewContent });
           setPreviewFileId((msg.content as PreviewContent).file_id);
+          if (typeof (msg.content as PreviewContent).enrichment_needed === "boolean") {
+            setEnrichmentNeeded((msg.content as PreviewContent).enrichment_needed!);
+          }
           break;
         case "done":
           setThinking(false);
@@ -323,13 +327,23 @@ export default function InventoryTool() {
                   Download CSV
                 </a>
                 {doneFileId && (
-                  <a
-                    href={getCleanTemplateDownloadUrl(doneFileId)}
-                    download
-                    className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-ui-text bg-white border border-ui-border hover:bg-gray-50 transition-all"
-                  >
-                    Download Template
-                  </a>
+                  <>
+                    <a
+                      href={getCleanTemplateDownloadUrl(doneFileId)}
+                      download
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-ui-text bg-white border border-ui-border hover:bg-gray-50 transition-all"
+                    >
+                      Download Template
+                    </a>
+                    <a
+                      href={getB2bMarketplaceDownloadUrl(doneFileId)}
+                      download
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium text-ui-text bg-white border border-ui-border hover:bg-gray-50 transition-all"
+                      title="24-column cleaned B2B marketplace CSV"
+                    >
+                      B2B Marketplace
+                    </a>
+                  </>
                 )}
               </div>
             )}
@@ -388,7 +402,7 @@ export default function InventoryTool() {
             {latestContextMsg.previewContent && (
               <div className="p-6 space-y-5">
                 <p className="text-[12px] text-ui-accent leading-relaxed">
-                  Preview the cleaned data. Click Category or Sub Category cells to edit.
+                  Preview the cleaned data. Click Category, Sub Category, or Brand cells to edit.
                 </p>
                 <DataPreview preview={latestContextMsg.previewContent} onCellEdit={handleCellEdit} onDeleteRow={handleDeleteRow} />
               </div>
