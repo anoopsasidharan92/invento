@@ -1,6 +1,7 @@
 import { ComponentType } from "react";
 import InventoryTool from "./InventoryTool";
 import PollenBDTool from "./PollenBDTool";
+import RealEstateTool from "./RealEstateTool";
 
 export interface ToolDefinition {
   id: string;
@@ -32,6 +33,15 @@ const tools: ToolDefinition[] = [
     color: "bg-green-900",
     status: "live",
     component: PollenBDTool,
+  },
+  {
+    id: "real-estate",
+    name: "Real Estate Agent",
+    description: "Chat-based property finder for rent or buy. Searches portals, ranks by your criteria, and organizes results.",
+    icon: "🏠",
+    color: "bg-blue-900",
+    status: "live",
+    component: RealEstateTool,
   },
   // ── Add new tools below ────────────────────────────────────────────────────
 ];

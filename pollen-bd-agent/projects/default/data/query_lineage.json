@@ -1,0 +1,206 @@
+{
+  "Skincare liquidation Malaysia 2024": {
+    "signal": "excess_inventory",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600005"
+  },
+  "Haircare surplus stock clearance Indonesia distributor": {
+    "signal": "excess_inventory",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600008"
+  },
+  "Cosmetic excess inventory Thailand warehouse": {
+    "signal": "excess_inventory",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600009"
+  },
+  "FMCG skincare surplus stock SEA": {
+    "signal": "excess_inventory",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600010"
+  },
+  "FMCG haircare excess inventory Philippines importer": {
+    "signal": "excess_inventory",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600010"
+  },
+  "Beauty brand discontinue product Malaysia": {
+    "signal": "product_discontinuation",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600011"
+  },
+  "Cosmetic company discontinue product line Indonesia": {
+    "signal": "product_discontinuation",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600012"
+  },
+  "Skincare product line pruning SEA distributor": {
+    "signal": "product_discontinuation",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600013"
+  },
+  "FMCG personal care portfolio pruning TH distributor": {
+    "signal": "product_discontinuation",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600013"
+  },
+  "Skincare brand exit Malaysia market": {
+    "signal": "market_exit",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600014"
+  },
+  "Beauty company exit Indonesia market 2024": {
+    "signal": "market_exit",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600014"
+  },
+  "FMCG cosmetics brand exit Thailand market distributor": {
+    "signal": "market_exit",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600015"
+  },
+  "FMCG personal care brand exit Philippines market": {
+    "signal": "market_exit",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600016"
+  },
+  "Skincare distributor warehouse clearance Malaysia": {
+    "signal": "warehouse_clearance",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600016"
+  },
+  "Haircare clearance sale Indonesia": {
+    "signal": "warehouse_clearance",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600017"
+  },
+  "FMCG cosmetics clearance sale Thailand": {
+    "signal": "warehouse_clearance",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600017"
+  },
+  "FMCG skincare clearance sale SEA": {
+    "signal": "warehouse_clearance",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600018"
+  },
+  "Beauty wholesaler buyer Malaysia": {
+    "signal": "discount_buyer",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600019"
+  },
+  "Cosmetic closeout buyer Indonesia": {
+    "signal": "discount_buyer",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600019"
+  },
+  "FMCG personal care surplus stock buyer Thailand Philippines": {
+    "signal": "discount_buyer",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600020"
+  },
+  "Skincare liquidation buyer SEA": {
+    "signal": "discount_buyer",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600021"
+  },
+  "FMCG haircare surplus stock buyer India": {
+    "signal": "discount_buyer",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-02T17:10:17.600021"
+  },
+  "Skincare liquidation Malaysia 2024 wholesale buyer": {
+    "signal": "discount_buyer",
+    "generation": 1,
+    "parent": "FMCG haircare surplus stock buyer India",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Haircare surplus stock Indonesia discount retailer": {
+    "signal": "discount_buyer",
+    "generation": 1,
+    "parent": "FMCG haircare surplus stock buyer India",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Cosmetic excess inventory Thailand factory overrun buyer": {
+    "signal": "discount_buyer",
+    "generation": 1,
+    "parent": "FMCG haircare surplus stock buyer India",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Beauty brand discontinue product Malaysia market exit": {
+    "signal": "market_exit",
+    "generation": 1,
+    "parent": "FMCG personal care brand exit Philippines market",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "FMCG cosmetics brand exit Philippines distributor change": {
+    "signal": "market_exit",
+    "generation": 1,
+    "parent": "FMCG personal care brand exit Philippines market",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Skincare product line pruning SEA parallel importer exit": {
+    "signal": "market_exit",
+    "generation": 1,
+    "parent": "FMCG personal care brand exit Philippines market",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "FMCG skincare factory overrun Thailand clearance sale": {
+    "signal": "factory_overrun",
+    "generation": 1,
+    "parent": null,
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Haircare surplus stock Indonesia factory overrun discount retailer": {
+    "signal": "factory_overrun",
+    "generation": 1,
+    "parent": null,
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Cosmetic excess inventory Malaysia factory overrun buyer": {
+    "signal": "factory_overrun",
+    "generation": 1,
+    "parent": null,
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Skincare distributor warehouse clearance MY overstocked": {
+    "signal": "warehouse_clearance",
+    "generation": 1,
+    "parent": "FMCG skincare clearance sale SEA",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "FMCG cosmetics warehouse clearance Thailand excess inventory": {
+    "signal": "warehouse_clearance",
+    "generation": 1,
+    "parent": "FMCG skincare clearance sale SEA",
+    "created_at": "2026-04-02T17:21:24.247774"
+  },
+  "Haircare surplus stock Indonesia warehouse clearance sale": {
+    "signal": "warehouse_clearance",
+    "generation": 1,
+    "parent": "FMCG skincare clearance sale SEA",
+    "created_at": "2026-04-02T17:21:24.247774"
+  }
+}

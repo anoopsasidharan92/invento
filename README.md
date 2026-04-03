@@ -1,8 +1,12 @@
 # AI Tools Platform
 
-A monorepo containing two AI-powered tools: an **Inventory Organizer** that normalises supplier spreadsheets into a standard business template, and a **BD Agent** that automates business development lead generation and outreach drafting.
+A monorepo containing three AI-powered tools:
 
-Both tools share a single FastAPI backend and a React frontend hub.
+- **Inventory Organizer** — normalises supplier spreadsheets into a standard business template
+- **BD Agent** — automates business development lead generation and outreach drafting
+- **Real Estate Agent** — finds and ranks property listings against client requirements
+
+All tools share a single FastAPI backend and a React frontend hub.
 
 ---
 
@@ -13,6 +17,7 @@ Both tools share a single FastAPI backend and a React frontend hub.
 - [Setup](#setup)
 - [Inventory Organizer](#inventory-organizer)
 - [BD Agent](#bd-agent)
+- [Real Estate Agent](#real-estate-agent)
 - [Project Structure](#project-structure)
 - [Configuration Reference](#configuration-reference)
 
@@ -23,7 +28,8 @@ Both tools share a single FastAPI backend and a React frontend hub.
 | Tool | What it does |
 |------|-------------|
 | **Inventory Organizer** | Upload any CSV or Excel inventory file — the AI analyses the structure, maps columns to a fixed business schema, lets you correct mappings via chat, and exports a normalised CSV |
-| **BD Agent** | Config-driven lead generation: searches the web (LinkedIn, Reddit, news, etc.) for matching prospects, qualifies each with an LLM, drafts outreach emails, deduplicates, and surfaces results in a live dashboard |
+| **BD Agent** | Config-driven lead generation: searches the web (LinkedIn, Reddit, news, etc.) for matching prospects, qualifies each with an LLM, drafts outreach emails, deduplicates, and self-evolves queries when exhausted |
+| **Real Estate Agent** | Config-driven listing discovery: searches property portals, filters non-listing URLs, scores match quality with an LLM, and self-evolves query sets when coverage is exhausted |
 
 ---
 
@@ -36,7 +42,7 @@ Both tools share a single FastAPI backend and a React frontend hub.
 | Ollama | latest | `brew install ollama` |
 | llama3.2 model | — | `ollama pull llama3.2` |
 
-A **Serper API key** is required for the BD Agent web search. Get one at [serper.dev](https://serper.dev).
+A **Serper API key** is required for BD Agent and Real Estate Agent live web search. Get one at [serper.dev](https://serper.dev).
 
 ---
 
@@ -79,14 +85,15 @@ npm run dev
 
 Open `http://localhost:5173` in your browser to access the tool hub.
 
-### 4. BD Agent API key (optional but required for live search)
+### 4. Agent API keys (optional but required for live search)
 
 ```bash
 cp pollen-bd-agent/.env.example pollen-bd-agent/.env
+cp real-estate-agent/.env.example real-estate-agent/.env
 # Edit .env and set SERPER_API_KEY=<your key>
 ```
 
-If the key is missing the agent falls back to mock search results for testing.
+If the key is missing, both agents fall back to mock search results for testing.
 
 ---
 
@@ -163,7 +170,8 @@ A config-driven business development agent that continuously searches the web fo
 3. **Qualification** — each result is evaluated by Ollama: fit score, priority (hot / warm / cold), category, country, signal type, and a draft outreach email are generated for each lead
 4. **Deduplication** — URL and name normalisation plus LLM-assisted semantic grouping remove redundant entries
 5. **Persistence** — qualified leads (above the configured `save_min` threshold) are saved to `data/leads.json` per project
-6. **Monitoring** — a live dashboard in the React frontend shows leads, stats, run/stop controls, and cleanup actions
+6. **Self-learning query loop** — query lineage is tracked in `data/query_lineage.json`; when all queries are exhausted (or yield quality drops), the agent auto-evolves `search_queries` in `config.json` and clears matching query cache in `data/search_history.json`
+7. **Monitoring** — a live dashboard in the React frontend shows leads, stats, run/stop controls, and cleanup actions
 
 ### Usage
 
@@ -190,6 +198,75 @@ The key fields in `pollen-bd-agent/projects/<id>/config.json` (see `config.examp
 | `signals` | Keywords that flag a lead as high-priority |
 | `target_schema` | What fields to extract per lead |
 
+### Reliability and troubleshooting
+
+- Ollama calls for lead qualification and query evolution are executed in strict JSON mode (`format: "json"`), with tolerant JSON extraction for fenced/mixed responses.
+- Evolution includes retry logic when Ollama returns an empty/invalid payload.
+- If you see repeated `queries exhausted` with no evolution:
+  - Ensure `ollama serve` is running on `http://localhost:11434`
+  - Ensure model exists (`ollama list`, should include `llama3.2`)
+  - Check project log in `pollen-bd-agent/projects/<id>/data/agent.log`
+  - Confirm `status.json` in the same folder moves to `done` after evolution
+
+---
+
+## Real Estate Agent
+
+### What it does
+
+A config-driven property discovery agent that searches listing portals, filters low-quality result URLs, evaluates each listing against buyer/renter criteria, and maintains a per-project listing pipeline.
+
+**Multi-project:** each project has its own `config.json`, `listings.json`, `status.json`, `search_history.json`, and `query_lineage.json` under `real-estate-agent/projects/<id>/`.
+
+### How it works
+
+1. **Project setup** — define budget, bedrooms, location preference, must-haves, nice-to-haves, and deal-breakers
+2. **Search accuracy targeting** — channel-specific `site:` + `inurl:` query hints for major property portals
+3. **URL quality filter** — portal pattern matching keeps individual property pages and drops search/category pages
+4. **Listing evaluation** — Ollama scores each result (`match_score`, hot/warm/cold priority, reason, extracted fields)
+5. **Persistence** — listings above `save_min` are stored in `data/listings.json`
+6. **Self-learning query loop** — when configured queries are exhausted (or quality is poor), the agent auto-evolves query groups using run stats plus starred/high-scoring listings as anchors
+7. **Cache refresh for new queries** — matching entries are removed from `data/search_history.json` so evolved queries run immediately next cycle
+
+### Usage
+
+1. Open `http://localhost:5173` and select **Real Estate Agent**
+2. Create/select a project and set criteria
+3. Click **Run search**
+4. Review `Hot Matches`, favorites, and listing pipeline states
+5. Re-run after adjustments; the agent evolves exhausted query sets automatically
+6. Export current listing view via CSV if needed
+
+### Per-project config
+
+Main fields in `real-estate-agent/projects/<id>/config.json` (see `real-estate-agent/config.example.json`):
+
+| Field | Description |
+|-------|-------------|
+| `listing_type` | `buy` or `rent` |
+| `budget_range` | Human-readable budget string |
+| `bedrooms` | Desired bedroom profile (e.g. `2-3 BHK`) |
+| `location_preference` | Priority localities/cities |
+| `must_haves` | Non-negotiable listing traits |
+| `nice_to_haves` | Preference boosts |
+| `deal_breakers` | Conditions that should strongly penalise a listing |
+| `result_schema.property_types` | Allowed property type values |
+| `result_schema.localities` | Preferred locality vocabulary |
+| `score_thresholds` | `hot_min`, `warm_min`, `save_min` |
+| `search_queries` | Signal-grouped query lists used by web search |
+| `search_channels` | Portal/channel order (`99acres`, `magicbricks`, `housing`, etc.) |
+| `search_geo` | Serper geography code |
+
+### Reliability and troubleshooting
+
+- Evaluation and evolution calls use strict JSON mode and resilient JSON extraction.
+- Evolution retries once automatically if the first model output is empty/invalid.
+- If the log shows `all queries exhausted` repeatedly:
+  - Verify Ollama is running and `llama3.2` is available
+  - Check `real-estate-agent/projects/<id>/data/agent.log` for `[evolve]` lines
+  - Confirm `status.json` changes to `done` with `Queries evolved for next run.`
+  - Then run search again to execute the refreshed query set
+
 ---
 
 ## Project Structure
@@ -213,7 +290,8 @@ Inventory Parsing/
 │   │   ├── tools/
 │   │   │   ├── registry.ts          # Tool registry
 │   │   │   ├── InventoryTool.tsx    # Inventory Organizer UI
-│   │   │   └── PollenBDTool.tsx     # BD Agent UI
+│   │   │   ├── PollenBDTool.tsx     # BD Agent UI
+│   │   │   └── RealEstateTool.tsx   # Real Estate Agent UI
 │   └── package.json
 ├── pollen-bd-agent/
 │   ├── agent.py             # BD agent subprocess — search, qualify, save leads
@@ -232,7 +310,24 @@ Inventory Parsing/
 │           └── data/
 │               ├── leads.json
 │               ├── status.json
+│               ├── search_history.json
+│               ├── query_lineage.json
 │               └── cleanup_summary.json
+├── real-estate-agent/
+│   ├── agent.py             # Real estate agent subprocess — search, evaluate, save listings, evolve queries
+│   ├── search.py            # Property portal search + URL quality filters
+│   ├── config_loader.py     # Loads per-project config.json
+│   ├── config.example.json  # Template for real estate project configuration
+│   ├── .env.example         # Serper API key template
+│   ├── projects.json        # Registry of all real-estate projects
+│   └── projects/
+│       └── <project-id>/
+│           ├── config.json
+│           └── data/
+│               ├── listings.json
+│               ├── status.json
+│               ├── search_history.json
+│               └── query_lineage.json
 ├── sample_inventory.csv
 ├── UI_DESIGN_SPEC.md
 └── venv/                    # Shared Python venv (gitignored)
@@ -242,11 +337,11 @@ Inventory Parsing/
 
 ## Configuration Reference
 
-### Environment variables (`pollen-bd-agent/.env`)
+### Environment variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `SERPER_API_KEY` | Yes (for live search) | Serper.dev API key for web search |
+| `SERPER_API_KEY` | Yes (for live search) | Serper.dev API key for web search (set in both `pollen-bd-agent/.env` and `real-estate-agent/.env`) |
 
 ### Ports
 
@@ -258,7 +353,8 @@ Inventory Parsing/
 
 ### Ollama model
 
-Both tools use `llama3.2` by default. This can be changed independently:
+All tools use `llama3.2` by default. This can be changed independently:
 
 - **Inventory Organizer:** `backend/agent.py` → `OLLAMA_MODEL`
 - **BD Agent qualify/cleanup:** `pollen-bd-agent/agent.py` and `pollen-bd-agent/cleanup.py` → the model name in the Ollama API call
+- **Real Estate Agent:** `real-estate-agent/agent.py` → `OLLAMA_MODEL`

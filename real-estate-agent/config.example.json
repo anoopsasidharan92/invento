@@ -1,0 +1,78 @@
+{
+  "_comment": "Real Estate Agent config. Customize for your property search requirements.",
+
+  "agent_name": "Real Estate Agent",
+  "listing_type": "buy",
+
+  "budget_range": "₹40 Lac - ₹80 Lac",
+  "bedrooms": "2-3 BHK",
+  "location_preference": "Bangalore — Whitefield, Sarjapur Road, Electronic City",
+  "additional_requirements": "Prefer gated community with good connectivity to tech parks. Ready-to-move preferred.",
+
+  "must_haves": [
+    "Within budget range (₹40L-₹80L)",
+    "2 or 3 BHK apartment or flat",
+    "Located in or near preferred areas (Whitefield, Sarjapur, Electronic City)",
+    "Ready to move in or possession within 6 months",
+    "Gated community or society"
+  ],
+
+  "nice_to_haves": [
+    "Swimming pool, gym, or clubhouse amenities",
+    "Close to metro station or major IT parks",
+    "Covered car parking included",
+    "East or north-east facing",
+    "Good school and hospital nearby"
+  ],
+
+  "deal_breakers": [
+    "Price significantly above budget (>₹90 Lac)",
+    "Location far from preferred areas (>15 km)",
+    "Under-construction with >2 year possession timeline",
+    "Commercial property listed as residential",
+    "Plot or land (not apartment/flat)"
+  ],
+
+  "result_schema": {
+    "property_types": ["apartment", "flat", "villa", "house", "penthouse", "studio", "plot", "other"],
+    "localities": ["Whitefield", "Sarjapur Road", "Electronic City", "HSR Layout", "Marathahalli", "other"]
+  },
+
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 3
+  },
+
+  "search_queries": [
+    {
+      "signal": "buy_apartment",
+      "queries": [
+        "2 BHK flat for sale Whitefield Bangalore under 70 lakhs",
+        "3 BHK apartment Sarjapur Road Bangalore 50-80 lakhs gated community",
+        "ready to move flat Electronic City Bangalore 2 BHK 3 BHK",
+        "new apartment projects Whitefield Bangalore 2024 affordable"
+      ]
+    },
+    {
+      "signal": "resale_property",
+      "queries": [
+        "resale flat Whitefield Bangalore 2 BHK under 60 lakhs",
+        "resale apartment Sarjapur Road Bangalore 3 BHK gated community",
+        "semi furnished flat for sale near IT park Bangalore"
+      ]
+    },
+    {
+      "signal": "new_projects",
+      "queries": [
+        "new residential projects Whitefield Bangalore 2024 2 BHK 3 BHK",
+        "upcoming apartment projects Sarjapur Road Bangalore affordable",
+        "RERA approved projects Electronic City Bangalore 2024"
+      ]
+    }
+  ],
+
+  "search_channels": ["99acres", "magicbricks", "housing", "google"],
+  "max_results_per_query": 5,
+  "search_geo": "in"
+}

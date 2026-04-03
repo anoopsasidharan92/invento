@@ -7,8 +7,8 @@
   "ideal_customer_profile": "Sungudi cotton saree suppliers from India, especially from Tamil Nadu clusters like Madurai, Salem, and Erode. We're looking for companies with ready inventory, scalable production capacity, and a focus on Sungudi cotton sarees.",
   "what_we_offer": "Consistent demand, structured buying, and long-term partnerships for Sungudi cotton sarees. We help sellers access new buyer markets and liquidate inventory faster.",
   "strong_signals": [
-    "Sellers offering Sungudi cotton only",
-    "Exporters with cancelled or deferred Sungudi cotton orders"
+    "Sellers and manufacturers offering Sungudi cotton only",
+    "Perfect if they based in Madurai / Dindigul / Chinnalapatti"
   ],
   "weak_signals": [
     "Generic saree sellers",
@@ -16,37 +16,6 @@
     "Made-to-order only manufacturers",
     "Premium or high-margin positioning"
   ],
-  "search_queries": [
-    {
-      "signal": "Sungudi_cotton_wholesaler",
-      "queries": [
-        "Sungudi cotton wholesalers",
-        "Sungudi cotton bulk supplier"
-      ]
-    },
-    {
-      "signal": "Sungudi_exporter",
-      "queries": [
-        "Sungudi cotton export houses",
-        "Exporting Tamil Nadu Sungudi cotton"
-      ]
-    }
-  ],
-  "search_channels": [
-    "linkedin",
-    "news",
-    "google",
-    "reddit",
-    "instagram",
-    "facebook"
-  ],
-  "search_geo": "in",
-  "max_results_per_query": 14,
-  "score_thresholds": {
-    "hot_min": 8,
-    "warm_min": 5,
-    "save_min": 4
-  },
   "result_schema": {
     "lead_name_field": "company_name",
     "categories": [
@@ -56,12 +25,46 @@
     ],
     "geographies": [
       "India",
-      "Export hubs like Surat, Mumbai, and Jaipur"
+      "Chinnalapatti",
+      "Dindigul",
+      "Madurai"
     ],
     "signal_types": [
       "Sungudi_cotton_wholesaler",
       "Sungudi_exporter"
     ]
   },
-  "batch_size": 0
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "Chinnalapatti",
+      "queries": [
+        "Chinnalapatti textile manufacturer",
+        "Chinnalapatti wholesale suppliers"
+      ]
+    },
+    {
+      "signal": [
+        "Dindigul",
+        "Madurai"
+      ],
+      "queries": [
+        "(Dindigul | Madurai) Sungudi cotton wholesalers",
+        "(Dindigul | Madurai) Exporting Tamil Nadu Sungudi cotton"
+      ]
+    }
+  ],
+  "search_channels": [
+    "news",
+    "google",
+    "reddit",
+    "instagram",
+    "facebook"
+  ],
+  "max_results_per_query": 14,
+  "search_geo": "in"
 }

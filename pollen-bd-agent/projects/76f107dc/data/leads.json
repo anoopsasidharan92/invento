@@ -101,7 +101,8 @@
     "status": "new",
     "notes": "",
     "channel": "news",
-    "channel_label": "News"
+    "channel_label": "News",
+    "starred": true
   },
   "816131cc85": {
     "company_name": "Nike",
@@ -121,7 +122,8 @@
     "status": "new",
     "notes": "",
     "channel": "news",
-    "channel_label": "News"
+    "channel_label": "News",
+    "starred": true
   },
   "1adfe46460": {
     "company_name": "Co-op",
@@ -455,6 +457,386 @@
     "signal_type": null,
     "id": "1407f9f42a",
     "found_at": "2026-03-22T14:53:54.608656",
+    "status": "new",
+    "notes": "",
+    "channel": "reddit",
+    "channel_label": "Reddit"
+  },
+  "c35ccae2f9": {
+    "company_name": "Tennco Distribution Ltd",
+    "category": "Southeast Asia company",
+    "country": "Korea",
+    "fit_score": 9,
+    "fit_reason": "Operational trigger: product discontinuation mentioned in the snippet, indicating potential inventory issues.",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Value recovery from excess inventory for Tennco Distribution Ltd",
+      "body": "Hi Supply Chain Team at Tennco Distribution Ltd, I saw that your company is discontinuing certain products. As a supply chain solutions company helping FMCG brands recover value from excess inventory in Southeast Asia and India, we'd like to explore how our AI-powered liquidation management system can help you optimize your inventory and reduce write-offs.",
+      "from": "Pollen Tech Supply Chain Solutions Team at Pollen Tech"
+    },
+    "source_url": "https://kr.linkedin.com/company/tennco-distribution-ltd",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "... product discontinuation.",
+    "id": "c35ccae2f9",
+    "found_at": "2026-04-03T08:50:41.843391",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "7d7981eb8c": {
+    "company_name": "AMSYS",
+    "category": "Germany company",
+    "country": "Germany",
+    "fit_score": 4,
+    "fit_reason": "Organizational trigger signal: product discontinuation notifications (PDN), but no clear connection to inventory management or FMCG industry, making it a weak fit.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Product Discontinuation and Inventory Optimization",
+      "body": "Hi AMSYS Team,\nI saw that you offer product discontinuation notifications (PDN). As an FMCG company facing inventory issues, we help brands recover value from excess inventory. Would love to discuss how our solution can assist with similar challenges.",
+      "from": "Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://gh.linkedin.com/company/amsys-gmbh---applicable-management-systems",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "... product discontinuation notifications (PDN) Services...",
+    "id": "7d7981eb8c",
+    "found_at": "2026-04-03T08:50:57.064893",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "dc375e4c0a": {
+    "company_name": "Veridian Partners LLC",
+    "category": "General business services/Consulting company",
+    "country": "",
+    "fit_score": 4,
+    "fit_reason": "Financial trigger: 'Working Capital Optimization' signal found, but lacks specific inventory implications. Could be relevant due to cost reduction efforts.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Transforming working capital for FMCG brands in Southeast Asia and India",
+      "body": "Hi Veridian Partners LLC team,\n\nI saw that your company is focused on working capital optimization. As a supply chain solutions company, we help FMCG brands like yours recover value from excess inventory in Southeast Asia and India.\n\nWould you be interested in exploring how our liquidation management system can support your clients' cost reduction efforts?\nBest regards,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.linkedin.com/company/veridian-partners-llc",
+    "signal_type": "",
+    "raw_snippet": "... cost reduction; $25MM in savings Led by industry veterans with global ... Working Capital Optimization \u2022 Turnarounds | Lean Transformation | Interim & Value ...",
+    "id": "dc375e4c0a",
+    "found_at": "2026-04-03T08:51:26.865491",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "3b47f1dd8c": {
+    "company_name": "Carpen Corp.",
+    "category": "Southeast Asia/India company",
+    "country": "Southeast Asia|India",
+    "fit_score": 8,
+    "fit_reason": "Financial trigger: Mention of cost reduction efforts, which may imply inventory implications and working capital optimization",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Cost Reduction Efforts: How Pollen Tech Can Help Carpen Corp. Recover Value from Excess Inventory",
+      "body": "Hi Carpen Corp., I saw that your company is focusing on cost reduction efforts, which may indicate an opportunity to optimize working capital tied up in excess inventory. Our AI-powered liquidation management system can help you connect with verified B2B buyers and automate clearance of excess stock."
+    },
+    "source_url": "https://www.linkedin.com/company/carpen-corp",
+    "signal_type": "string:financial_trigger",
+    "raw_snippet": "... cost reduction efforts will have the biggest impact. Think lean ... Accounts Payable: Your Hidden Lever for Working Capital Optimization Accounts ...",
+    "id": "3b47f1dd8c",
+    "found_at": "2026-04-03T08:51:44.174979",
+    "status": "new",
+    "notes": "",
+    "channel": "linkedin",
+    "channel_label": "LinkedIn"
+  },
+  "5d5d9ca3a9": {
+    "company_name": "Boston Scientific",
+    "category": "Medical Device company",
+    "country": "United States",
+    "fit_score": 9,
+    "fit_reason": "Signal: operational_trigger (product discontinuation) and financial_trigger (voluntary recall) relevant to FMCG industry, but note that this is a medical device company. Fit score adjusted accordingly.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Recovering Value from Discontinued Products in Southeast Asia and India",
+      "body": "I saw that Boston Scientific is discontinuing the LOTUS Edge Aortic Valve System due to complexities with product delivery. As a medical device company, this may not seem directly relevant to FMCG brands like yours. However, we help companies like IDT recover value from excess inventory in Southeast Asia and India. Our AI-powered liquidation management system can connect you with verified B2B buyers and reduce working capital tied up in unused inventory. Would you like to learn more about how Pollen Tech's solution can benefit your business?"
+    },
+    "source_url": "https://news.bostonscientific.com/2020-11-17-Boston-Scientific-Announces-LOTUS-Edge-TM-Aortic-Valve-System-Voluntary-Recall-and-Product-Discontinuation",
+    "signal_type": "string:operational_trigger",
+    "raw_snippet": "Boston Scientific initiated a global, voluntary recall of all unused inventory of LOTUS Edge due to complexities with the product delivery...",
+    "id": "5d5d9ca3a9",
+    "found_at": "2026-04-03T08:52:38.991986",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "325b6a3c47": {
+    "company_name": "Samsung",
+    "category": "Electronics company",
+    "country": "South Korea|China",
+    "fit_score": 5,
+    "fit_reason": "The article mentions Samsung axing the TriFold design, which could be related to a product discontinuation or cancellation that might impact their inventory.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Following up on Samsung's TriFold cancellation - How Pollen Tech can help with excess inventory",
+      "body": "Hi, I saw that The Verge's Allison Johnson got stuck with a Chinese ROM version of the TriFold. It seems like Samsung has cancelled the design. As an FMCG company, you might be dealing with similar issues and could benefit from our liquidation management system to reduce working capital tied up in excess inventory."
+    },
+    "source_url": "https://www.techbuzz.ai/articles/samsung-kills-trifold-before-most-could-touch-it",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "The Verge's Allison Johnson got stuck with a Chinese ROM version - then Samsung axed it.",
+    "id": "325b6a3c47",
+    "found_at": "2026-04-03T08:52:49.443391",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "1e6e296047": {
+    "company_name": "Waitrose",
+    "category": "Retail (UK)",
+    "country": "United Kingdom",
+    "fit_score": 9,
+    "fit_reason": "Organizational trigger: new Supply Chain Director role being hired, relevant to ICP's focus on operational and organizational changes in FMCG companies",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Andy Perry joins Waitrose as new supply chain head - A potential opportunity for Pollen Tech",
+      "body": "I saw that Waitrose has hired Andy Perry as its new supply chain director, taking over from Alison Maffin. With Alison's 16-year tenure coming to an end, this change may lead to a review of Waitrose's inventory management and supply chain strategies. Our expertise in optimizing working capital tied up in excess inventory could be beneficial to the company. Let's schedule a call to discuss how Pollen Tech can support Waitrose in achieving its goals."
+    },
+    "source_url": "https://www.thegrocer.co.uk/news/waitrose-hires-new-supply-chain-head-as-alison-maffin-departs/717139.article",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "Andy Perry has joined Waitrose as its supply chain director, taking over from Alison Maffin, who has left the retailer after 16 years.",
+    "id": "1e6e296047",
+    "found_at": "2026-04-03T08:53:18.754750",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "7949764202": {
+    "company_name": "...",
+    "category": "US company",
+    "country": "United States",
+    "fit_score": 4,
+    "fit_reason": "Organizational trigger: hiring plans collapse, which could lead to restructuring and inventory optimization efforts.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Considering Job Cuts? How Pollen Tech Can Help You Recover Value from Excess Inventory",
+      "body": "As U.S. companies navigate restructuring after January's job cuts, it's essential to focus on optimizing working capital tied up in excess inventory. Our liquidation management system can help you connect with verified B2B buyers and reduce write-offs."
+    },
+    "source_url": "...",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "U.S. companies also announced just 5306 new hires in January, which was the weakest total for the month since CG&C began tracking data in...",
+    "id": "7949764202",
+    "found_at": "2026-04-03T08:53:27.802787",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "2853f5b0c0": {
+    "company_name": "BioWorks",
+    "category": "FMCG company",
+    "country": "United States",
+    "fit_score": 6,
+    "fit_reason": "Appoints new hires to lead pest management marketing and strengthen sales teams, suggesting potential operational or organizational changes",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Hires and Appointments at BioWorks",
+      "body": "Hi BioWorks team,\n\nI saw that Envu has hired Melissa Kahan to lead pest management marketing. Given your recent growth in the FMCG industry, we think our liquidation management system could help you optimize your working capital and reduce excess inventory.\nBest, Pollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.greenhousegrower.com/management/bioworks-envu-and-p-l-light-systems-announce-new-hires-and-appointments/",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "Envu hires Melissa Kahan to lead pest management marketing",
+    "id": "2853f5b0c0",
+    "found_at": "2026-04-03T08:53:51.934268",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "700e01bafd": {
+    "company_name": "...",
+    "category": "Global company",
+    "country": "",
+    "fit_score": 4,
+    "fit_reason": "The article discusses the challenges of maintaining margins in volatile markets, which is a common issue for FMCG companies with excess inventory.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Addressing Shrinking Margins and Excess Inventory in Volatile Markets",
+      "body": "Dear [Company], I saw that the article mentions mounting cost pressures and shrinking margins. As a Supply Chain Solutions company helping FMCG brands recover value from excess inventory, we can help you sustain margins in volatile markets."
+    },
+    "source_url": "https://www.kearney.com/service/operations-performance/article/beyond-efficiency-sustaining-margins-in-volatile-markets",
+    "signal_type": "string:financial_trigger",
+    "raw_snippet": "producing companies are facing mounting cost pressures and shrinking margins.",
+    "id": "700e01bafd",
+    "found_at": "2026-04-03T08:56:07.580301",
+    "status": "new",
+    "notes": "",
+    "channel": "news",
+    "channel_label": "News"
+  },
+  "9cc2d54c91": {
+    "company_name": "AG BARR p.l.c.",
+    "category": "FMCG company",
+    "country": "United Kingdom",
+    "fit_score": 8,
+    "fit_reason": "Signal: string:organizational_trigger, specific mention of 'acquisition' and 'discontinuation' in the context of product development",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Exciting Opportunity to Recover Value from Excess Inventory with Pollen Tech",
+      "body": "Hi AG BARR p.l.c. team, I saw that your company is considering an acquisition and noted the mention of product discontinuation in the report. Our AI-powered liquidation management system can help you recover value from excess inventory, connecting you with verified B2B buyers. Would love to discuss further how Pollen Tech can support your business."
+    },
+    "source_url": "https://assets.publishing.service.gov.uk/media/55194de0e5274a142b000488/130709_final_report.pdf",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "6.133 We note that entry could range from a new pack format for an existing product or a new flavour, to a similar product to one already ...",
+    "id": "9cc2d54c91",
+    "found_at": "2026-04-03T08:57:04.791601",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "fd9e88d502": {
+    "company_name": "",
+    "category": "US company",
+    "country": "",
+    "fit_score": 4,
+    "fit_reason": "The article discusses how to communicate a product discontinuation to customers, which is relevant to the operational trigger of product discontinuation.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Discontinuing X: How to Communicate with Customers",
+      "body": "Hi [Company Name], I saw that your company is discontinuing a certain product. As a supply chain solutions expert, I'd like to offer guidance on how to effectively communicate this change to your customers."
+    },
+    "source_url": "",
+    "signal_type": "string:operational_trigger",
+    "raw_snippet": "Announcing a product discontinuation should address those two concerns and offer a simple solution going forward.",
+    "id": "fd9e88d502",
+    "found_at": "2026-04-03T08:57:15.954503",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "80924eb2d0": {
+    "company_name": "...",
+    "category": "FMCG company",
+    "country": "Southeast Asia|India",
+    "fit_score": 4,
+    "fit_reason": "Organizational trigger (new strategy or direction mentioned) related to product discontinuation, but not specific enough to score higher",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "New Opportunities for Innovation through Product Discontinuation",
+      "body": "Hi [Company Name] Team,\n\nI saw that your article on product discontinuation highlights an opportunity to drive innovation. As a company helping FMCG brands recover value from excess inventory, we'd like to discuss how our expertise can support you in this area.\nBest regards,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "...",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "Instead of viewing product discontinuation as a setback, brands can use it as a launchpad for innovation.",
+    "id": "80924eb2d0",
+    "found_at": "2026-04-03T08:57:39.635101",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "7fdb659af2": {
+    "company_name": null,
+    "category": null,
+    "country": null,
+    "fit_score": 6,
+    "fit_reason": "Organizational trigger: company is discontinuing a product, which could lead to excess inventory and write-offs.",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Your Product Discontinuation Strategy Could Be Costly - Pollen Tech",
+      "body": "As a FMCG brand in Southeast Asia or India, discontinuing products can be costly. Our AI-powered liquidation management system can help you recover value from excess inventory."
+    },
+    "source_url": "https://www.lawinsider.com/dictionary/product-discontinuation",
+    "signal_type": "string:organizational_trigger",
+    "raw_snippet": "Product Discontinuation means a process by which the electrical or mechanical components of a Product become no longer compatible with Product specification ...",
+    "id": "7fdb659af2",
+    "found_at": "2026-04-03T08:57:51.118201",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "28b9869496": {
+    "company_name": "Nike",
+    "category": "FMCG company",
+    "country": "United States",
+    "fit_score": 7,
+    "fit_reason": "Signal of cost reduction and Working Capital Optimization, relevant to FMCG companies facing inventory issues in Nike's context",
+    "priority": "warm",
+    "outreach_email": {
+      "subject": "Nike's Cost Reduction Strategy: How Pollen Tech Can Help",
+      "body": "Hi [Name], I saw that Nike is optimizing its working capital. As a leading provider of liquidation management solutions for FMCG brands, we can help you recover value from excess inventory. Let's discuss how our expertise can support your cost reduction efforts."
+    },
+    "source_url": "https://vimeo.com/426345815",
+    "signal_type": "string:financial_trigger",
+    "raw_snippet": "... cost reduction ... Working Capital Optimization",
+    "id": "28b9869496",
+    "found_at": "2026-04-03T08:58:32.267938",
+    "status": "new",
+    "notes": "",
+    "channel": "google",
+    "channel_label": "Google"
+  },
+  "dce262c59d": {
+    "company_name": null,
+    "category": null,
+    "country": null,
+    "fit_score": 4,
+    "fit_reason": "The user mentions 'certain product' being discontinued, which is an operational trigger. This shows that the company has experience with product discontinuation.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Following up on your product discontinuation concerns",
+      "body": "Hi there,\n\nI saw that you were looking for guidance on product discontinuation. As a supply chain solutions company, we help FMCG brands recover value from excess inventory when products are discontinued.\n\nWould you be open to discussing how our liquidation management system can help?\nBest,\nPollen Tech Supply Chain Solutions Team"
+    },
+    "source_url": "https://www.reddit.com/r/Naturalhair/comments/1rgioho/product_discontinuation_guidance/",
+    "signal_type": "string:operational_trigger",
+    "raw_snippet": "Product discontinuation guidance. Need Advice. Hello all, middle eastern mama over here spiraling because I haven't been able to find a ...",
+    "id": "dce262c59d",
+    "found_at": "2026-04-03T08:58:46.058230",
+    "status": "new",
+    "notes": "",
+    "channel": "reddit",
+    "channel_label": "Reddit"
+  },
+  "5f86f638c0": {
+    "company_name": "Aldi",
+    "category": "FMCG",
+    "country": "Europe",
+    "fit_score": 9,
+    "fit_reason": "Operational trigger: product discontinuation signal mentioned in the post",
+    "priority": "hot",
+    "outreach_email": {
+      "subject": "Aldi's Product Discontinuation: A Clear Signal for Inventory Recovery",
+      "body": "Hi Aldi Team, I saw that you're discontinuing certain products. As an FMCG expert, I think Pollen Tech can help you recover value from excess inventory. Our AI-powered liquidation management system automates clearance and connects brands with verified B2B buyers."
+    },
+    "source_url": "https://www.reddit.com/r/aldi/comments/1alzh5v/why_aldi_why_product_discontinuation_and_im_bummed/",
+    "signal_type": "operational_trigger",
+    "raw_snippet": "Why, Aldi, Why? Product Discontinuation and I'm bummed!",
+    "id": "5f86f638c0",
+    "found_at": "2026-04-03T08:59:11.958675",
+    "status": "new",
+    "notes": "",
+    "channel": "reddit",
+    "channel_label": "Reddit"
+  },
+  "41db46ab83": {
+    "company_name": "Delhivery Ltd",
+    "category": "Stock Trading India company",
+    "country": "India",
+    "fit_score": 4,
+    "fit_reason": "Weak signal, as the snippet does not mention specific operational triggers or inventory issues directly.",
+    "priority": "cold",
+    "outreach_email": {
+      "subject": "Improving Efficiency with Inventory Management for Indian FMCG Companies",
+      "body": "Hi Delhivery Ltd Team,\nI saw that you're exploring warehouse automation and sustainability measures. Our AI-powered liquidation management system helps FMCG brands reduce working capital tied up in excess inventory, improve cash flow, and increase market share.\n\nBest, [Supply Chain Solutions Team at Pollen Tech]"
+    },
+    "source_url": "https://www.reddit.com/r/stock_trading_India/comments/1mowwja/delhivery_ltd/",
+    "signal_type": "",
+    "raw_snippet": "for sustainability and cost reduction. Warehouse automation ROI ... Working capital optimization and cash flow generation. Market share ...",
+    "id": "41db46ab83",
+    "found_at": "2026-04-03T08:59:24.110957",
     "status": "new",
     "notes": "",
     "channel": "reddit",

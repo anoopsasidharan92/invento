@@ -1,0 +1,75 @@
+{
+  "agent_name": "Real Estate Agent \u2014 Whitefield",
+  "listing_type": "buy",
+  "budget_range": "\u20b91.7 Cr - \u20b92 Cr",
+  "bedrooms": "3 BHK",
+  "location_preference": "Whitefield, Bangalore",
+  "additional_requirements": "Ready-to-move or ready in a year, car parking mandatory",
+  "must_haves": [
+    "Car parking"
+  ],
+  "nice_to_haves": [
+    "Proximity to metro"
+  ],
+  "deal_breakers": [
+    "Ground floor"
+  ],
+  "result_schema": {
+    "property_types": [
+      "apartment"
+    ],
+    "localities": [
+      "Whitefield"
+    ]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 3
+  },
+  "search_queries": [
+    {
+      "signal": "signal_name",
+      "queries": [
+        "3 BHK ready-to-move apartment in Whitefield, Bangalore \u20b92 Cr",
+        "Car parking mandatory for 3 BHK apartments in Whitefield \u20b91.7 Cr - \u20b92 Cr",
+        "Ready possession or completion in a year: 3 BHK apartments in Whitefield, Bangalore",
+        "\u20b91.7 Cr - \u20b92 Cr 3 BHK flats with car parking available in Whitefield"
+      ]
+    },
+    {
+      "signal": "signal_name",
+      "queries": [
+        "Prestige Park Grove 3 BHK apartment for sale in Whitefield, Bangalore",
+        "Whitefield apartments \u20b91.5 Cr - \u20b92 Cr 3 BHK with car parking",
+        "Car parking included for 3 BHK apartments near Whitefield Railway Station",
+        "\u20b91.85 Cr 3 BHK flats in Whitefield with car parking and possession in a year"
+      ]
+    },
+    {
+      "signal": "signal_name",
+      "queries": [
+        "Sumadhura Edition 3 BHK apartment for sale in Whitefield, Bangalore \u20b92 Cr",
+        "Ready-to-move apartments in Whitefield with 3 BHK and car parking available",
+        "Car parking mandatory for 3 BHK apartments near Mysore Road, Whitefield",
+        "\u20b91.66 Cr - \u20b92.98 Cr 3 BHK flats with car parking in Whitefield"
+      ]
+    },
+    {
+      "signal": "signal_name",
+      "queries": [
+        "TRU AQUAPOLIS 3 BHK flat for sale in Whitefield, Bangalore \u20b92 Cr",
+        "Car parking available for apartments near Whitefield International Airport",
+        "Possession in a year: 3 BHK flats in Whitefield with car parking included",
+        "\u20b91.43 Cr - \u20b93.47 Cr 3 BHK apartments in Whitefield with car parking"
+      ]
+    }
+  ],
+  "search_channels": [
+    "99acres",
+    "magicbricks",
+    "housing"
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "in"
+}

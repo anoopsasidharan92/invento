@@ -1,0 +1,92 @@
+{
+  "\"new pack format\" + \"clearance\"": {
+    "signal": "operational_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487053"
+  },
+  "\"product discontinuation\"": {
+    "signal": "operational_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487055"
+  },
+  "\"Supply Chain Director new hire\"": {
+    "signal": "organizational_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487057"
+  },
+  "\"demand planning role hiring\"": {
+    "signal": "organizational_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487057"
+  },
+  "(\"inventory provisions increase\") + \"write-off\"": {
+    "signal": "financial_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487058"
+  },
+  "(\"working capital optimization\") + \"cost reduction\"": {
+    "signal": "financial_trigger",
+    "generation": 0,
+    "parent": null,
+    "created_at": "2026-04-03T08:49:23.487059"
+  },
+  "\"new pack format\" + \"stock clearance\"": {
+    "signal": "operational_trigger",
+    "generation": 1,
+    "parent": "\"product discontinuation\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"product discontinuation announcement\"": {
+    "signal": "operational_trigger",
+    "generation": 1,
+    "parent": "\"product discontinuation\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"inventory realignment process underway\"": {
+    "signal": "operational_trigger",
+    "generation": 1,
+    "parent": "\"product discontinuation\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"Supply Chain Director hiring plans\"": {
+    "signal": "organizational_trigger",
+    "generation": 1,
+    "parent": "\"demand planning role hiring\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"demand planning team expansion\"": {
+    "signal": "organizational_trigger",
+    "generation": 1,
+    "parent": "\"demand planning role hiring\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"regional restructuring efforts announced\"": {
+    "signal": "organizational_trigger",
+    "generation": 1,
+    "parent": "\"demand planning role hiring\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "(\"inventory write-off increase\") + \"cost savings\"": {
+    "signal": "financial_trigger",
+    "generation": 1,
+    "parent": "(\"working capital optimization\") + \"cost reduction\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"working capital optimization strategies\"": {
+    "signal": "financial_trigger",
+    "generation": 1,
+    "parent": "(\"working capital optimization\") + \"cost reduction\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  },
+  "\"asset-based lending facility utilization\"": {
+    "signal": "financial_trigger",
+    "generation": 1,
+    "parent": "(\"working capital optimization\") + \"cost reduction\"",
+    "created_at": "2026-04-03T08:59:40.738849"
+  }
+}

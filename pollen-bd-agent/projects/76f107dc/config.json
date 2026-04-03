@@ -4,7 +4,7 @@
   "sender_company": "Pollen Tech",
   "sender_description": "Supply chain solutions company helping FMCG brands recover value from excess inventory in Southeast Asia and India",
   "qualifier_context": "Pollen Tech helps FMCG brands stop losing money on excess inventory. We're FMCG-specific, connected to real demand, and enterprise-proven. Reach out for a structured solution to your write-off problem.",
-  "ideal_customer_profile": "Mid-to-large companies in Southeast Asia and India facing inventory issues",
+  "ideal_customer_profile": "Mid-to-large Fortune 500 companies in Southeast Asia and India facing inventory issues",
   "what_we_offer": "Lily AI-powered liquidation management system that automates clearance, connects brands with verified B2B buyers, and reduces working capital tied up in excess inventory",
   "strong_signals": [
     "Operational triggers: packaging refresh, product discontinuation, distributor termination, post-campaign overstock",
@@ -14,42 +14,6 @@
   "weak_signals": [
     "General supply chain concerns or cost-saving initiatives without clear inventory implications"
   ],
-  "search_queries": [
-    {
-      "signal": "operational_trigger",
-      "queries": [
-        "\"new pack format\" + \"clearance\"",
-        "\"product discontinuation\""
-      ]
-    },
-    {
-      "signal": "organizational_trigger",
-      "queries": [
-        "\"Supply Chain Director new hire\"",
-        "\"demand planning role hiring\""
-      ]
-    },
-    {
-      "signal": "financial_trigger",
-      "queries": [
-        "(\"inventory provisions increase\") + \"write-off\"",
-        "(\"working capital optimization\") + \"cost reduction\""
-      ]
-    }
-  ],
-  "search_channels": [
-    "linkedin",
-    "news",
-    "google",
-    "reddit"
-  ],
-  "search_geo": "Malaysia India Thailand Singapore Indonesia",
-  "max_results_per_query": 5,
-  "score_thresholds": {
-    "hot_min": 8,
-    "warm_min": 5,
-    "save_min": 4
-  },
   "result_schema": {
     "lead_name_field": "company_name",
     "categories": [
@@ -65,5 +29,42 @@
       "string:financial_trigger"
     ]
   },
-  "batch_size": 0
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "operational_trigger",
+      "queries": [
+        "\"new pack format\" + \"stock clearance\"",
+        "\"product discontinuation announcement\"",
+        "\"inventory realignment process underway\""
+      ]
+    },
+    {
+      "signal": "organizational_trigger",
+      "queries": [
+        "\"Supply Chain Director hiring plans\"",
+        "\"demand planning team expansion\"",
+        "\"regional restructuring efforts announced\""
+      ]
+    },
+    {
+      "signal": "financial_trigger",
+      "queries": [
+        "(\"inventory write-off increase\") + \"cost savings\"",
+        "\"working capital optimization strategies\"",
+        "\"asset-based lending facility utilization\""
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news",
+    "google"
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "Southeast Asia India"
 }

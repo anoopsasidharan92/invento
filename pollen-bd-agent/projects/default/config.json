@@ -64,55 +64,40 @@
   },
   "search_queries": [
     {
-      "signal": "excess_inventory",
+      "signal": "discount_buyer",
       "queries": [
-        "Skincare liquidation Malaysia 2024",
-        "Haircare surplus stock clearance Indonesia distributor",
-        "Cosmetic excess inventory Thailand warehouse",
-        "FMCG skincare surplus stock SEA",
-        "FMCG haircare excess inventory Philippines importer"
-      ]
-    },
-    {
-      "signal": "product_discontinuation",
-      "queries": [
-        "Beauty brand discontinue product Malaysia",
-        "Cosmetic company discontinue product line Indonesia",
-        "Skincare product line pruning SEA distributor",
-        "FMCG personal care portfolio pruning TH distributor"
+        "Skincare liquidation Malaysia 2024 wholesale buyer",
+        "Haircare surplus stock Indonesia discount retailer",
+        "Cosmetic excess inventory Thailand factory overrun buyer"
       ]
     },
     {
       "signal": "market_exit",
       "queries": [
-        "Skincare brand exit Malaysia market",
-        "Beauty company exit Indonesia market 2024",
-        "FMCG cosmetics brand exit Thailand market distributor",
-        "FMCG personal care brand exit Philippines market"
+        "Beauty brand discontinue product Malaysia market exit",
+        "FMCG cosmetics brand exit Philippines distributor change",
+        "Skincare product line pruning SEA parallel importer exit"
+      ]
+    },
+    {
+      "signal": "factory_overrun",
+      "queries": [
+        "FMCG skincare factory overrun Thailand clearance sale",
+        "Haircare surplus stock Indonesia factory overrun discount retailer",
+        "Cosmetic excess inventory Malaysia factory overrun buyer"
       ]
     },
     {
       "signal": "warehouse_clearance",
       "queries": [
-        "Skincare distributor warehouse clearance Malaysia",
-        "Haircare clearance sale Indonesia",
-        "FMCG cosmetics clearance sale Thailand",
-        "FMCG skincare clearance sale SEA"
-      ]
-    },
-    {
-      "signal": "discount_buyer",
-      "queries": [
-        "Beauty wholesaler buyer Malaysia",
-        "Cosmetic closeout buyer Indonesia",
-        "FMCG personal care surplus stock buyer Thailand Philippines",
-        "Skincare liquidation buyer SEA",
-        "FMCG haircare surplus stock buyer India"
+        "Skincare distributor warehouse clearance MY overstocked",
+        "FMCG cosmetics warehouse clearance Thailand excess inventory",
+        "Haircare surplus stock Indonesia warehouse clearance sale"
       ]
     }
   ],
   "max_results_per_query": 5,
   "search_geo": "MY",
   "max_leads": 120,
-  "batch_size": 200
+  "batch_size": 50
 }

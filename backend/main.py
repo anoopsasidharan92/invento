@@ -31,6 +31,11 @@ POLLEN_DIR           = Path(__file__).parent.parent / "pollen-bd-agent"
 POLLEN_PROJECTS_DIR  = POLLEN_DIR / "projects"
 POLLEN_PROJECTS_FILE = POLLEN_DIR / "projects.json"
 
+# ─── Real Estate Agent paths ──────────────────────────────────────────────────
+RE_DIR              = Path(__file__).parent.parent / "real-estate-agent"
+RE_PROJECTS_DIR     = RE_DIR / "projects"
+RE_PROJECTS_FILE    = RE_DIR / "projects.json"
+
 
 # ─── Pollen Project Helpers ────────────────────────────────────────────────────
 
@@ -338,6 +343,220 @@ def pollen_delete_lead(pid: str, lid: str):
     _pollen_save_leads(data_path, leads)
 
 
+@app.post("/pollen/{pid}/leads/manual")
+async def pollen_add_manual_lead(pid: str, body: dict):
+    """
+    Look up a company by name, qualify it against the project ICP via Ollama,
+    and add it to the leads list if it passes the save_min threshold.
+    If it fails the threshold, return the scored result anyway so the UI can
+    show the user *why* it was skipped and offer a force-add option.
+    """
+    import hashlib as _hashlib
+    import datetime as _dt
+    import requests as _requests
+
+    company_name = (body.get("company_name") or "").strip()
+    force_add    = bool(body.get("force_add", False))
+    if not company_name:
+        raise HTTPException(400, "company_name is required")
+
+    _pollen_get_project(pid)
+    cfg_path, data_path, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(400, "Project not configured yet")
+
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+
+    # ── Load SERPER key from pollen .env ──────────────────────────────────────
+    serper_key = os.environ.get("SERPER_API_KEY", "")
+    pollen_env = POLLEN_DIR / ".env"
+    if pollen_env.exists():
+        for line in pollen_env.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                if k.strip() == "SERPER_API_KEY":
+                    serper_key = v.strip()
+
+    # ── Search for the company via Serper ────────────────────────────────────
+    search_geo = cfg.get("search_geo", "in")
+    snippets: list[dict] = []
+
+    if serper_key:
+        for query, endpoint in [
+            (f'"{company_name}" site:linkedin.com/company', "search"),
+            (f'"{company_name}"', "news"),
+            (f'"{company_name}"', "search"),
+        ]:
+            try:
+                r = _requests.post(
+                    f"https://google.serper.dev/{endpoint}",
+                    headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                    json={"q": query, "num": 3, "gl": search_geo},
+                    timeout=10,
+                )
+                r.raise_for_status()
+                data = r.json()
+                items = data.get("organic", data.get("news", []))
+                for item in items[:3]:
+                    snippets.append({
+                        "title":   item.get("title", ""),
+                        "url":     item.get("link", ""),
+                        "snippet": item.get("snippet", ""),
+                    })
+                if snippets:
+                    break
+            except Exception:
+                pass
+    else:
+        # No Serper key — create a stub result so Ollama can still try to score it
+        snippets = [{"title": company_name, "url": "", "snippet": f"Manual lookup: {company_name}"}]
+
+    # Use the best snippet (first one found)
+    best = snippets[0] if snippets else {"title": company_name, "url": "", "snippet": ""}
+
+    # ── Build qualifier prompt (mirrors agent.py logic) ───────────────────────
+    schema      = cfg.get("result_schema", {})
+    thresholds  = cfg.get("score_thresholds", {})
+    hot_min     = thresholds.get("hot_min", 8)
+    warm_min    = thresholds.get("warm_min", 5)
+    save_min    = thresholds.get("save_min", 4)
+    lead_field  = schema.get("lead_name_field", "company_name")
+    categories  = "|".join(schema.get("categories", []))
+    geographies = "|".join(schema.get("geographies", []))
+    signal_types= "|".join(schema.get("signal_types", []))
+    strong      = "\n".join(f"- {s}" for s in cfg.get("strong_signals", []))
+    weak        = "\n".join(f"- {s}" for s in cfg.get("weak_signals", []))
+    icp         = cfg.get("ideal_customer_profile", "")
+    what_we_offer = cfg.get("what_we_offer", "")
+    sender      = cfg.get("sender_name", "")
+    company     = cfg.get("sender_company", "")
+    company_desc= cfg.get("sender_description", "")
+
+    icp_section   = f"\nIdeal Customer Profile:\n{icp}\n" if icp else ""
+    offer_section = f"\nWhat we offer:\n{what_we_offer}\n" if what_we_offer else ""
+
+    # Load starred leads for context calibration
+    leads_data = _pollen_load_leads(data_path)
+    starred_examples = [l for l in leads_data.values() if l.get("starred")]
+    starred_ctx = ""
+    if starred_examples:
+        lines = "\n".join(
+            f"  - {l.get('company_name','?')} | signal={l.get('signal_type','?')} | country={l.get('country','?')} | snippet={l.get('raw_snippet','')[:120]}"
+            for l in starred_examples
+        )
+        starred_ctx = f"\n\nThe user has flagged these as GREAT leads (⭐ starred). Use them to calibrate your scoring:\n{lines}\n"
+
+    qualifier_system = f"""{cfg.get("qualifier_context", "")}
+{icp_section}{offer_section}
+Your job: evaluate a raw search result and decide if it is a good prospective lead.
+
+Strong signals (score high if present):
+{strong}
+
+Weak or irrelevant signals (score low or discard):
+{weak}
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "{lead_field}": "...",
+  "category": "{categories}",
+  "country": "{geographies}",
+  "fit_score": 1-10,
+  "fit_reason": "1-2 sentence reason citing the specific signal found",
+  "priority": "hot|warm|cold",
+  "outreach_email": {{
+    "subject": "...",
+    "body": "..."
+  }},
+  "source_url": "...",
+  "signal_type": "{signal_types}",
+  "raw_snippet": "..."
+}}
+
+fit_score guide: {hot_min}-10 = hot, {warm_min}-{hot_min - 1} = warm, 1-{warm_min - 1} = cold.
+priority mirrors score: {hot_min}-10=hot, {warm_min}-{hot_min - 1}=warm, 1-{warm_min - 1}=cold.
+Be strict: only score high if there is a concrete, specific signal.
+
+The outreach email should:
+- Be from {sender} at {company} ({company_desc})
+- Open by referencing the exact signal found
+- Explain briefly what {company} offers and why it's relevant
+- Be concise: 4-6 sentences max
+- Do NOT invent facts.{starred_ctx}""".strip()
+
+    user_prompt = f"""Search result to evaluate:
+Title: {best['title']}
+URL: {best['url']}
+Snippet: {best['snippet']}
+
+Note: This company ({company_name}) was manually submitted by the user as a potential lead.
+"""
+
+    # ── Call Ollama ───────────────────────────────────────────────────────────
+    OLLAMA_URL   = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def call_ollama():
+        return _requests.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "stream": False,
+                "messages": [
+                    {"role": "system", "content": qualifier_system},
+                    {"role": "user",   "content": user_prompt},
+                ],
+            },
+            timeout=120,
+        )
+
+    try:
+        resp = await asyncio.get_event_loop().run_in_executor(None, call_ollama)
+        resp.raise_for_status()
+        text = resp.json()["message"]["content"].strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        qualified = json.loads(text)
+    except Exception as e:
+        raise HTTPException(500, f"Qualification failed: {e}")
+
+    fit_score = qualified.get("fit_score", 0)
+
+    # ── Decide whether to save ────────────────────────────────────────────────
+    lid = _hashlib.md5((best["url"] + company_name).encode()).hexdigest()[:10]
+    qualified["id"]           = lid
+    qualified["found_at"]     = _dt.datetime.now().isoformat()
+    qualified["status"]       = "new"
+    qualified["notes"]        = ""
+    qualified["channel"]      = "manual"
+    qualified["channel_label"]= "Manual"
+
+    below_threshold = fit_score < save_min and not force_add
+
+    if below_threshold:
+        # Return the scored result without saving — let the UI decide
+        return {
+            "saved": False,
+            "below_threshold": True,
+            "save_min": save_min,
+            "lead": qualified,
+        }
+
+    # Save (either passes threshold, or user forced it)
+    leads_data[lid] = qualified
+    _pollen_save_leads(data_path, leads_data)
+    return {
+        "saved": True,
+        "below_threshold": False,
+        "save_min": save_min,
+        "lead": qualified,
+    }
+
+
 @app.get("/pollen/{pid}/stats")
 def pollen_stats(pid: str):
     _pollen_get_project(pid)
@@ -379,14 +598,19 @@ def pollen_agent_context(pid: str):
     company = cfg.get("sender_company", "")
     company_desc = cfg.get("sender_description", "")
 
-    qualifier_prompt = f"""{cfg.get('qualifier_context', '')}
+    icp = cfg.get("ideal_customer_profile", "")
+    what_we_offer = cfg.get("what_we_offer", "")
+    icp_section = f"\nIdeal Customer Profile:\n{icp}\n" if icp else ""
+    offer_section = f"\nWhat we offer:\n{what_we_offer}\n" if what_we_offer else ""
 
+    qualifier_prompt = f"""{cfg.get('qualifier_context', '')}
+{icp_section}{offer_section}
 Your job: evaluate a raw search result and decide if it is a good prospective lead.
 
-Strong signals:
+Strong signals (score high if present):
 {strong}
 
-Weak or irrelevant signals:
+Weak or irrelevant signals (score low or discard):
 {weak}
 
 Return ONLY valid JSON (no markdown, no explanation):
@@ -406,14 +630,17 @@ Return ONLY valid JSON (no markdown, no explanation):
   "raw_snippet": "..."
 }}
 
-fit_score guide: {hot_min}-10 = hot (clear signal), {warm_min}-{hot_min - 1} = warm (indirect signal), 1-{warm_min - 1} = cold (weak fit).
+fit_score guide: {hot_min}-10 = hot (clear, specific signal matching ICP), {warm_min}-{hot_min - 1} = warm (indirect or partial signal), 1-{warm_min - 1} = cold (weak or no fit).
 priority mirrors score: {hot_min}-10=hot, {warm_min}-{hot_min - 1}=warm, 1-{warm_min - 1}=cold.
+
+Be strict: only score high if there is a concrete, specific signal. Generic industry news = cold.
 
 The outreach email should:
 - Be from {sender} at {company} ({company_desc})
-- Reference the specific signal you found (be specific, not generic)
+- Open by referencing the exact signal found (e.g. "I saw that [company] is discontinuing X")
+- Explain briefly what {company} offers and why it's relevant to their situation
 - Be concise: 4-6 sentences max
-- Subject line: compelling, not salesy
+- Subject line: specific and compelling, not generic or salesy
 - Do NOT invent facts. Only reference what's in the snippet.""".strip()
 
     starred_leads = []
@@ -546,6 +773,31 @@ def pollen_run(pid: str):
         raise HTTPException(500, f"Failed to start agent: {e}")
 
 
+@app.get("/pollen/{pid}/search-history")
+def pollen_search_history(pid: str):
+    """Return the search history for this project."""
+    _pollen_get_project(pid)
+    history_path = _pollen_project_dir(pid) / "data" / "search_history.json"
+    if not history_path.exists():
+        return {"queries": {}, "total": 0}
+    try:
+        with open(history_path) as f:
+            history = json.load(f)
+        return {"queries": history, "total": len(history)}
+    except Exception:
+        return {"queries": {}, "total": 0}
+
+
+@app.delete("/pollen/{pid}/search-history", status_code=204)
+def pollen_clear_search_history(pid: str):
+    """Clear search history so all queries run fresh on next agent run."""
+    _pollen_get_project(pid)
+    history_path = _pollen_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists():
+        history_path.unlink()
+    return
+
+
 @app.post("/pollen/{pid}/stop")
 def pollen_stop(pid: str):
     """Stop a running agent for this project."""
@@ -625,6 +877,166 @@ def pollen_patch_config(pid: str, payload: dict):
     return {"ok": True}
 
 
+@app.post("/pollen/{pid}/refine-queries")
+async def pollen_refine_queries(pid: str):
+    """
+    Use Ollama to suggest query refinements based on starred + manually-added leads.
+    Returns a proposed new search_queries list with a diff vs the current one.
+    Does NOT apply changes — the frontend shows a review UI first.
+    """
+    import requests as _requests
+
+    _pollen_get_project(pid)
+    cfg_path, data_path, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(400, "Project not configured yet")
+
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+
+    leads_data = _pollen_load_leads(data_path)
+    reference_leads = [
+        l for l in leads_data.values()
+        if l.get("starred") or l.get("channel") == "manual"
+    ]
+
+    if not reference_leads:
+        raise HTTPException(400, "No starred or manually-added leads to refine from. Star some good leads first.")
+
+    # Build a compact summary of reference leads
+    ref_lines = "\n".join(
+        f"  - {l.get('company_name', '?')} | category={l.get('category', '?')} | country={l.get('country', '?')} | signal={l.get('signal_type', '?')} | score={l.get('fit_score', '?')} | reason={l.get('fit_reason', '')[:100]} | snippet={l.get('raw_snippet', '')[:120]}"
+        for l in reference_leads
+    )
+
+    current_queries_json = json.dumps(cfg.get("search_queries", []), indent=2, ensure_ascii=False)
+    icp = cfg.get("ideal_customer_profile", "")
+    strong = "\n".join(f"  - {s}" for s in cfg.get("strong_signals", []))
+    signal_types = json.dumps(cfg.get("result_schema", {}).get("signal_types", []), ensure_ascii=False)
+    geographies = json.dumps(cfg.get("result_schema", {}).get("geographies", []), ensure_ascii=False)
+    search_geo = cfg.get("search_geo", "")
+
+    system_prompt = f"""You are a B2B lead generation strategist refining a search query set.
+
+CONTEXT:
+- ICP: {icp}
+- Strong signals:
+{strong}
+- Target geographies: {geographies}
+- Search geo setting: {search_geo}
+- Valid signal types: {signal_types}
+
+REFERENCE LEADS (starred or manually added by user as confirmed good examples):
+{ref_lines}
+
+CURRENT SEARCH QUERIES:
+{current_queries_json}
+
+TASK:
+Analyse the reference leads to understand the specific company types, language patterns, signals, and geographies that are working well. Then rewrite the search_queries to:
+1. Add NEW queries that would surface more companies like the reference leads (use their specific language, signals, industries, geographies)
+2. MODIFY existing queries that are too generic — make them more targeted based on what you now know works
+3. REMOVE queries that are clearly off-target given the reference leads (mark them with "dropped": true in the output)
+4. KEEP queries that are still relevant and specific enough
+
+Rules for queries:
+- Each query should be a short search string (5-10 words) a human would type into Google
+- Include geography, industry terms, company types, and trigger events
+- No vague queries — every query must have at least one specific qualifier
+- Aim for 4-6 queries per signal group
+- Only use signal types from the valid list above
+
+Output ONLY this JSON (no markdown, no explanation):
+{{
+  "proposed": [
+    {{"signal": "signal_type_here", "queries": ["query 1", "query 2", ...]}}
+  ],
+  "dropped": ["list of query strings that were removed"],
+  "added": ["list of query strings that are new"],
+  "reasoning": "2-3 sentence summary of what changed and why, based on the reference leads"
+}}"""
+
+    OLLAMA_URL   = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def call_ollama():
+        return _requests.post(
+            OLLAMA_URL,
+            json={
+                "model": OLLAMA_MODEL,
+                "stream": False,
+                "messages": [{"role": "user", "content": system_prompt}],
+            },
+            timeout=180,
+        )
+
+    try:
+        resp = await asyncio.get_event_loop().run_in_executor(None, call_ollama)
+        resp.raise_for_status()
+        text = resp.json()["message"]["content"].strip()
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+        result = json.loads(text)
+    except Exception as e:
+        raise HTTPException(500, f"Query refinement failed: {e}")
+
+    return {
+        "current":  cfg.get("search_queries", []),
+        "proposed": result.get("proposed", []),
+        "dropped":  result.get("dropped", []),
+        "added":    result.get("added", []),
+        "reasoning": result.get("reasoning", ""),
+        "reference_count": len(reference_leads),
+    }
+
+
+@app.post("/pollen/{pid}/refine-queries/apply")
+def pollen_apply_refined_queries(pid: str, body: dict):
+    """
+    Apply a proposed search_queries list from the refine step.
+    Clears search history only for new/changed queries so existing ones aren't re-run.
+    """
+    _pollen_get_project(pid)
+    cfg_path, _, _ = _pollen_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(400, "Project not configured yet")
+
+    proposed = body.get("proposed")
+    added    = body.get("added", [])
+    if not proposed:
+        raise HTTPException(400, "proposed queries required")
+
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+
+    cfg["search_queries"] = proposed
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+
+    # Clear history entries only for new/added queries so we don't re-run unchanged ones
+    history_path = _pollen_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists() and added:
+        try:
+            with open(history_path) as f:
+                history = json.load(f)
+            # History keys are "{channel}::{query}" — remove entries whose query part is new
+            added_set = set(q.strip().lower() for q in added)
+            keys_to_remove = [
+                k for k in history
+                if any(q in k.lower() for q in added_set)
+            ]
+            for k in keys_to_remove:
+                del history[k]
+            with open(history_path, "w") as f:
+                json.dump(history, f, indent=2)
+        except Exception:
+            pass  # Non-fatal — worst case the new queries just run again
+
+    return {"ok": True, "applied": len(proposed)}
+
+
 @app.get("/pollen/{pid}/config/status")
 def pollen_config_status(pid: str):
     """Returns whether a config exists for this project."""
@@ -650,6 +1062,10 @@ def pollen_config_save(pid: str, data: dict):
     cfg_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cfg_path, "w") as f:
         json.dump(data, f, indent=2)
+    # Clear search history so new config gets fresh searches
+    history_path = _pollen_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists():
+        history_path.unlink()
     return {"ok": True}
 
 
@@ -1085,6 +1501,1158 @@ The values above are the DEFAULTS. Only edit the fields the user's feedback requ
                         f"The JSON you produced has a syntax error: {parse_err}. "
                         "Please output ONLY the corrected JSON between <CONFIG> and </CONFIG> tags — "
                         "no other text, no markdown fences."
+                    )
+                    history.append({"role": "user", "content": fix_prompt})
+                    retry_reply = await asyncio.get_event_loop().run_in_executor(
+                        None, lambda: ollama_chat(history, SYSTEM)
+                    )
+                    history.append({"role": "assistant", "content": retry_reply})
+                    if "<CONFIG>" in retry_reply and "</CONFIG>" in retry_reply:
+                        raw_cfg2 = retry_reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                        try:
+                            new_cfg = json.loads(raw_cfg2)
+                            with open(cfg_path, "w") as f:
+                                json.dump(new_cfg, f, indent=2)
+                            await ws.send_text(json.dumps({"type": "config_ready", "content": new_cfg}))
+                        except json.JSONDecodeError:
+                            await ws.send_text(json.dumps({
+                                "type": "agent",
+                                "content": "I'm having repeated trouble generating valid JSON. Please try rephrasing your feedback.",
+                            }))
+                    else:
+                        await ws.send_text(json.dumps({"type": "agent", "content": retry_reply}))
+            else:
+                await ws.send_text(json.dumps({"type": "agent", "content": reply}))
+
+    except WebSocketDisconnect:
+        pass
+
+
+# ─── Real Estate Agent Helpers ─────────────────────────────────────────────────
+
+def _re_project_dir(pid: str) -> Path:
+    return RE_PROJECTS_DIR / pid
+
+
+def _re_project_paths(pid: str):
+    d = _re_project_dir(pid)
+    return d / "config.json", d / "data" / "listings.json", d / "data" / "agent.log"
+
+
+def _re_load_projects() -> list:
+    if RE_PROJECTS_FILE.exists():
+        with open(RE_PROJECTS_FILE) as f:
+            return json.load(f)
+    return []
+
+
+def _re_save_projects(projects: list):
+    RE_PROJECTS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with open(RE_PROJECTS_FILE, "w") as f:
+        json.dump(projects, f, indent=2)
+
+
+def _re_load_listings(data_path: Path) -> dict:
+    if data_path.exists():
+        with open(data_path) as f:
+            return json.load(f)
+    return {}
+
+
+def _re_save_listings(data_path: Path, listings: dict):
+    data_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(data_path, "w") as f:
+        json.dump(listings, f, indent=2)
+
+
+def _re_status_path(pid: str) -> Path:
+    return _re_project_dir(pid) / "data" / "status.json"
+
+
+def _re_write_status(pid: str, job: str, state: str, detail: str = ""):
+    import datetime as _dt
+    path = _re_status_path(pid)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump({
+            "job":    job,
+            "state":  state,
+            "detail": detail,
+            "ts":     _dt.datetime.now().isoformat(),
+        }, f)
+
+
+def _re_read_status(pid: str) -> dict:
+    path = _re_status_path(pid)
+    if path.exists():
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {"job": "idle", "state": "done", "detail": "", "ts": ""}
+
+
+_re_procs: Dict[str, "subprocess.Popen[bytes]"] = {}
+
+
+def _re_get_project(pid: str) -> dict:
+    projects = _re_load_projects()
+    for p in projects:
+        if p["id"] == pid:
+            return p
+    raise HTTPException(404, f"Project '{pid}' not found")
+
+
+# ─── Real Estate Agent API ────────────────────────────────────────────────────
+
+@app.get("/realestate/projects")
+def re_list_projects():
+    projects = _re_load_projects()
+    result = []
+    for p in projects:
+        cfg_path, _, _ = _re_project_paths(p["id"])
+        result.append({**p, "configured": cfg_path.exists()})
+    return result
+
+
+@app.post("/realestate/projects", status_code=201)
+def re_create_project(data: dict):
+    import uuid, datetime as _dt
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Project name is required")
+    pid = str(uuid.uuid4())[:8]
+    project_dir = _re_project_dir(pid)
+    (project_dir / "data").mkdir(parents=True, exist_ok=True)
+    projects = _re_load_projects()
+    entry = {"id": pid, "name": name, "created_at": _dt.datetime.now().isoformat()}
+    projects.append(entry)
+    _re_save_projects(projects)
+    return {**entry, "configured": False}
+
+
+@app.patch("/realestate/projects/{pid}")
+def re_rename_project(pid: str, data: dict):
+    _re_get_project(pid)
+    name = (data.get("name") or "").strip()
+    if not name:
+        raise HTTPException(400, "Project name is required")
+    projects = _re_load_projects()
+    for p in projects:
+        if p["id"] == pid:
+            p["name"] = name
+            break
+    _re_save_projects(projects)
+    cfg_path, _, _ = _re_project_paths(pid)
+    updated = next(p for p in projects if p["id"] == pid)
+    return {**updated, "configured": cfg_path.exists()}
+
+
+@app.delete("/realestate/projects/{pid}", status_code=204)
+def re_delete_project(pid: str):
+    import shutil
+    _re_get_project(pid)
+    project_dir = _re_project_dir(pid)
+    if project_dir.exists():
+        shutil.rmtree(project_dir)
+    projects = _re_load_projects()
+    projects = [p for p in projects if p["id"] != pid]
+    _re_save_projects(projects)
+
+
+@app.get("/realestate/{pid}/listings")
+def re_listings(pid: str, status: str = "", priority: str = ""):
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    listings = _re_load_listings(data_path)
+    items = list(listings.values())
+    if status:
+        items = [l for l in items if l.get("status") == status]
+    if priority:
+        items = [l for l in items if l.get("priority") == priority]
+    priority_order = {"hot": 0, "warm": 1, "cold": 2}
+    items.sort(key=lambda x: priority_order.get(x.get("priority", "cold"), 2))
+    return items
+
+
+@app.get("/realestate/{pid}/listings/starred")
+def re_starred_listings(pid: str):
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    listings = _re_load_listings(data_path)
+    return [l for l in listings.values() if l.get("starred")]
+
+
+@app.patch("/realestate/{pid}/listings/{lid}")
+def re_update_listing(pid: str, lid: str, data: dict):
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    listings = _re_load_listings(data_path)
+    if lid not in listings:
+        raise HTTPException(404, "Listing not found")
+    for field in ("status", "notes", "starred"):
+        if field in data:
+            listings[lid][field] = data[field]
+    _re_save_listings(data_path, listings)
+    return listings[lid]
+
+
+@app.delete("/realestate/{pid}/listings/{lid}", status_code=204)
+def re_delete_listing(pid: str, lid: str):
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    listings = _re_load_listings(data_path)
+    if lid not in listings:
+        raise HTTPException(404, "Listing not found")
+    del listings[lid]
+    _re_save_listings(data_path, listings)
+    if not listings:
+        _re_auto_clear_search_history(pid)
+
+
+@app.delete("/realestate/{pid}/listings", status_code=200)
+def re_delete_all_listings(pid: str):
+    """Delete all listings and auto-clear search history so next run starts fresh."""
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    count = len(_re_load_listings(data_path))
+    _re_save_listings(data_path, {})
+    _re_auto_clear_search_history(pid)
+    return {"deleted": count}
+
+
+def _re_auto_clear_search_history(pid: str):
+    history_path = _re_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists():
+        history_path.unlink()
+
+
+@app.post("/realestate/{pid}/listings/from-url")
+async def re_listing_from_url(pid: str, payload: dict):
+    """Fetch a property URL, extract details via Ollama, and save as a listing."""
+    import requests as _requests
+    import hashlib as _hashlib
+    import datetime as _dt
+
+    url = (payload.get("url") or "").strip()
+    if not url:
+        raise HTTPException(400, "url is required")
+
+    _re_get_project(pid)
+    cfg_path, data_path, _ = _re_project_paths(pid)
+
+    project_cfg = {}
+    if cfg_path.exists():
+        with open(cfg_path) as f:
+            project_cfg = json.load(f)
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    _browser_headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Cache-Control": "no-cache",
+        "Pragma": "no-cache",
+        "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+        "Sec-Ch-Ua-Mobile": "?0",
+        "Sec-Ch-Ua-Platform": '"macOS"',
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Upgrade-Insecure-Requests": "1",
+    }
+
+    html = ""
+    page_fetched = False
+    try:
+        session = _requests.Session()
+        resp = session.get(url, timeout=20, headers=_browser_headers, allow_redirects=True)
+        resp.raise_for_status()
+        html = resp.text[:30_000]
+        page_fetched = True
+    except Exception:
+        pass
+
+    serper_snippet = ""
+    if not page_fetched:
+        re_env = RE_DIR / ".env"
+        serper_key = ""
+        if re_env.exists():
+            for line in re_env.read_text().splitlines():
+                line = line.strip()
+                if line.startswith("SERPER_API_KEY="):
+                    serper_key = line.split("=", 1)[1].strip()
+        if serper_key:
+            try:
+                sr = _requests.post(
+                    "https://google.serper.dev/search",
+                    json={"q": url, "num": 3},
+                    headers={"X-API-KEY": serper_key, "Content-Type": "application/json"},
+                    timeout=15,
+                )
+                if sr.ok:
+                    results = sr.json()
+                    snippets = []
+                    for item in results.get("organic", [])[:3]:
+                        title = item.get("title", "")
+                        snippet = item.get("snippet", "")
+                        snippets.append(f"Title: {title}\nSnippet: {snippet}")
+                    serper_snippet = "\n\n".join(snippets)
+            except Exception:
+                pass
+
+    if not page_fetched and not serper_snippet:
+        html = f"[Page could not be fetched directly. Extract all possible information from the URL pattern.]\nURL: {url}"
+
+    schema = project_cfg.get("result_schema", {})
+    property_types = "|".join(schema.get("property_types", ["Apartment", "Villa", "Independent House", "Plot"]))
+
+    system_prompt = f"""You are a property data extractor. Given page content, search snippets, or even just a property URL, extract structured data.
+
+Real estate URLs encode rich information in their slugs. For example:
+- "3-bhk-apartment-in-kannamangala-for-rs-21000000" → 3 BHK, Apartment, Kannamangala, ₹2.1 Cr
+- "prestige-somerville-whitefield-bangalore-1773-sq-ft" → Prestige Somerville, Whitefield, Bangalore, 1773 sq.ft
+- "/buy/resale/" in path → listing_type is "buy"; "/rent/" → listing_type is "rent"
+
+Return ONLY valid JSON (no markdown, no explanation):
+{{
+  "property_name": "Short descriptive name of the property/listing",
+  "property_type": "{property_types}",
+  "locality": "Specific area/locality name",
+  "city": "City name",
+  "price": "Price as mentioned (e.g. ₹45 Lac, $350,000, ₹25,000/month, ₹2.1 Cr)",
+  "bedrooms": "Number of bedrooms (e.g. 2 BHK, 3 BHK, Studio)",
+  "area_sqft": "Area if mentioned (e.g. 1200 sq.ft)",
+  "key_features": ["feature1", "feature2", "feature3"],
+  "listing_type": "rent|buy",
+  "raw_snippet": "A brief 1-2 line description of the property"
+}}
+
+Extract as much information as possible. If a field cannot be determined, use an empty string.
+For listing_type, infer from URL path or context — "for sale", "buy", "resale" → "buy"; "for rent", "lease", "pg" → "rent".
+For price, convert raw numbers to readable format (e.g. 21000000 → ₹2.1 Cr, 4500000 → ₹45 Lac).
+For key_features, pick the top 3-5 highlights if available.""".strip()
+
+    context_parts = [f"Extract property details from this listing.\n\nURL: {url}"]
+    if page_fetched and html:
+        context_parts.append(f"--- PAGE CONTENT ---\n{html}")
+    if serper_snippet:
+        context_parts.append(f"--- SEARCH ENGINE SNIPPETS ---\n{serper_snippet}")
+    if not page_fetched and not serper_snippet:
+        context_parts.append(
+            "The page could not be fetched. Extract as much as possible from the URL slug — "
+            "real estate URLs typically encode: BHK count, property type, locality, city, price, area, builder name. "
+            "Parse the URL path segments carefully."
+        )
+    user_msg = "\n\n".join(context_parts)
+
+    def call_ollama():
+        ollama_payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_msg},
+            ],
+        }
+        r = _requests.post(OLLAMA_URL, json=ollama_payload, timeout=120)
+        r.raise_for_status()
+        return r.json()["message"]["content"]
+
+    import asyncio
+    try:
+        raw_reply = await asyncio.get_event_loop().run_in_executor(None, call_ollama)
+    except Exception as exc:
+        raise HTTPException(502, f"Ollama extraction failed: {exc}")
+
+    cleaned = raw_reply.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1]
+    if cleaned.endswith("```"):
+        cleaned = cleaned.rsplit("```", 1)[0]
+    cleaned = cleaned.strip()
+
+    try:
+        extracted = json.loads(cleaned)
+    except json.JSONDecodeError:
+        raise HTTPException(502, f"Ollama returned invalid JSON. Raw: {cleaned[:500]}")
+
+    lid = _hashlib.md5(url.encode()).hexdigest()[:12]
+
+    listing = {
+        "id": lid,
+        "property_name": extracted.get("property_name", ""),
+        "property_type": extracted.get("property_type", ""),
+        "locality": extracted.get("locality", ""),
+        "city": extracted.get("city", ""),
+        "price": extracted.get("price", ""),
+        "bedrooms": extracted.get("bedrooms", ""),
+        "area_sqft": extracted.get("area_sqft", ""),
+        "match_score": 0,
+        "match_reason": "Manually added via URL",
+        "priority": "warm",
+        "key_features": extracted.get("key_features", []),
+        "source_url": url,
+        "listing_type": extracted.get("listing_type", "buy"),
+        "raw_snippet": extracted.get("raw_snippet", ""),
+        "found_at": _dt.datetime.now().isoformat(),
+        "status": "new",
+        "notes": "",
+        "starred": False,
+        "channel": _detect_channel(url),
+        "channel_label": "",
+    }
+
+    if project_cfg:
+        listing = await _re_evaluate_listing(listing, project_cfg)
+
+    listings = _re_load_listings(data_path)
+    listings[lid] = listing
+    _re_save_listings(data_path, listings)
+    return listing
+
+
+def _detect_channel(url: str) -> str:
+    url_lower = url.lower()
+    for domain, channel in [
+        ("99acres.com", "99acres"), ("magicbricks.com", "magicbricks"),
+        ("housing.com", "housing"), ("nobroker.in", "nobroker"),
+        ("zillow.com", "zillow"), ("realtor.com", "realtor"),
+        ("redfin.com", "redfin"), ("trulia.com", "trulia"),
+        ("rightmove.co.uk", "rightmove"), ("zoopla.co.uk", "zoopla"),
+        ("commonfloor.com", "commonfloor"), ("makaan.com", "makaan"),
+        ("squareyards.com", "squareyards"),
+    ]:
+        if domain in url_lower:
+            return channel
+    return "web"
+
+
+async def _re_evaluate_listing(listing: dict, cfg: dict) -> dict:
+    """Score a manually-added listing against project criteria using Ollama."""
+    import requests as _requests
+    import asyncio
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    schema = cfg.get("result_schema", {})
+    thresholds = cfg.get("score_thresholds", {})
+    hot_min = thresholds.get("hot", 8)
+    warm_min = thresholds.get("warm", 5)
+
+    must_haves = "\n".join(f"- {s}" for s in cfg.get("must_haves", []))
+    nice_to_haves = "\n".join(f"- {s}" for s in cfg.get("nice_to_haves", []))
+    deal_breakers = "\n".join(f"- {s}" for s in cfg.get("deal_breakers", []))
+
+    system_prompt = f"""You are a real estate evaluator. Score this property against the client's requirements.
+
+Client requirements:
+- Listing type: {cfg.get("listing_type", "buy")}
+- Budget range: {cfg.get("budget_range", "")}
+- Bedrooms: {cfg.get("bedrooms", "")}
+- Location preference: {cfg.get("location_preference", "")}
+
+Must-haves:
+{must_haves or "(none)"}
+
+Nice-to-haves:
+{nice_to_haves or "(none)"}
+
+Deal-breakers:
+{deal_breakers or "(none)"}
+
+Return ONLY valid JSON:
+{{
+  "match_score": 1-10,
+  "match_reason": "1-2 sentence reason",
+  "priority": "hot|warm|cold"
+}}
+
+Score guide: {hot_min}-10 = hot, {warm_min}-{hot_min - 1} = warm, 1-{warm_min - 1} = cold.""".strip()
+
+    prop_summary = (
+        f"Property: {listing.get('property_name', '?')}\n"
+        f"Type: {listing.get('property_type', '?')}\n"
+        f"Location: {listing.get('locality', '?')}, {listing.get('city', '?')}\n"
+        f"Price: {listing.get('price', '?')}\n"
+        f"Bedrooms: {listing.get('bedrooms', '?')}\n"
+        f"Area: {listing.get('area_sqft', '?')}\n"
+        f"Features: {', '.join(listing.get('key_features', []))}\n"
+        f"Description: {listing.get('raw_snippet', '')}"
+    )
+
+    def call_ollama():
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"Evaluate this property:\n\n{prop_summary}"},
+            ],
+        }
+        r = _requests.post(OLLAMA_URL, json=payload, timeout=120)
+        r.raise_for_status()
+        return r.json()["message"]["content"]
+
+    try:
+        raw = await asyncio.get_event_loop().run_in_executor(None, call_ollama)
+        cleaned = raw.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[-1]
+        if cleaned.endswith("```"):
+            cleaned = cleaned.rsplit("```", 1)[0]
+        score_data = json.loads(cleaned.strip())
+        listing["match_score"] = score_data.get("match_score", 0)
+        listing["match_reason"] = score_data.get("match_reason", listing["match_reason"])
+        listing["priority"] = score_data.get("priority", "warm")
+    except Exception:
+        pass
+
+    return listing
+
+
+@app.get("/realestate/{pid}/stats")
+def re_stats(pid: str):
+    _re_get_project(pid)
+    _, data_path, _ = _re_project_paths(pid)
+    listings = _re_load_listings(data_path)
+    items = list(listings.values())
+    return {
+        "total":     len(items),
+        "new":       sum(1 for l in items if l.get("status") == "new"),
+        "hot":       sum(1 for l in items if l.get("priority") == "hot"),
+        "contacted": sum(1 for l in items if l.get("status") == "contacted"),
+        "reviewed":  sum(1 for l in items if l.get("status") == "reviewed"),
+        "starred":   sum(1 for l in items if l.get("starred")),
+    }
+
+
+@app.get("/realestate/{pid}/context")
+def re_agent_context(pid: str):
+    _re_get_project(pid)
+    cfg_path, data_path, _ = _re_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Not configured yet")
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+
+    schema = cfg.get("result_schema", {})
+    thresholds = cfg.get("score_thresholds", {})
+
+    starred_listings = []
+    if data_path.exists():
+        try:
+            with open(data_path) as f:
+                all_listings = json.load(f)
+            starred_listings = [
+                {
+                    "property_name": l.get("property_name", "?"),
+                    "locality": l.get("locality", "?"),
+                    "city": l.get("city", "?"),
+                    "price": l.get("price", "?"),
+                    "bedrooms": l.get("bedrooms", "?"),
+                    "match_score": l.get("match_score"),
+                    "match_reason": l.get("match_reason", ""),
+                }
+                for l in all_listings.values() if l.get("starred")
+            ]
+        except Exception:
+            pass
+
+    return {
+        "config": {
+            "agent_name": cfg.get("agent_name", ""),
+            "listing_type": cfg.get("listing_type", "buy"),
+            "budget_range": cfg.get("budget_range", ""),
+            "bedrooms": cfg.get("bedrooms", ""),
+            "location_preference": cfg.get("location_preference", ""),
+            "additional_requirements": cfg.get("additional_requirements", ""),
+        },
+        "must_haves": cfg.get("must_haves", []),
+        "nice_to_haves": cfg.get("nice_to_haves", []),
+        "deal_breakers": cfg.get("deal_breakers", []),
+        "search_queries": cfg.get("search_queries", []),
+        "result_schema": schema,
+        "score_thresholds": thresholds,
+        "starred_listings": starred_listings,
+        "search_geo": cfg.get("search_geo", ""),
+        "search_channels": cfg.get("search_channels", ["99acres", "magicbricks", "housing", "google"]),
+        "max_results_per_query": cfg.get("max_results_per_query", 5),
+        "batch_size": cfg.get("batch_size", 0),
+    }
+
+
+@app.get("/realestate/{pid}/log")
+def re_log(pid: str):
+    _re_get_project(pid)
+    _, _, log_path = _re_project_paths(pid)
+    if log_path.exists():
+        lines = log_path.read_text().splitlines()[-50:]
+        return {"log": "\n".join(lines)}
+    return {"log": "No log yet."}
+
+
+@app.get("/realestate/{pid}/status")
+def re_status(pid: str):
+    _re_get_project(pid)
+    status = _re_read_status(pid)
+    if status.get("state") == "running" and status.get("ts"):
+        import datetime as _dt
+        try:
+            started = _dt.datetime.fromisoformat(status["ts"])
+            age = (_dt.datetime.now() - started).total_seconds()
+            if age > 1800:
+                _re_write_status(pid, status.get("job", "run"), "done", "timed out")
+                status = _re_read_status(pid)
+        except Exception:
+            pass
+    return status
+
+
+@app.post("/realestate/{pid}/run")
+def re_run(pid: str):
+    _re_get_project(pid)
+    current = _re_read_status(pid)
+    if current.get("state") == "running":
+        raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
+    project_dir = str(_re_project_dir(pid))
+    agent_script = str(RE_DIR / "agent.py")
+    venv_python = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    env = os.environ.copy()
+    re_env = RE_DIR / ".env"
+    if re_env.exists():
+        for line in re_env.read_text().splitlines():
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                env[k.strip()] = v.strip()
+    try:
+        _re_write_status(pid, "run", "running", "Agent searching for properties…")
+        proc = subprocess.Popen(
+            [venv_python, agent_script, "--project-dir", project_dir],
+            cwd=str(RE_DIR),
+            env=env,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        _re_procs[pid] = proc
+        import threading
+        def _watch(p, _pid):
+            p.wait()
+            _re_procs.pop(_pid, None)
+            current = _re_read_status(_pid)
+            if current.get("state") == "running":
+                _re_write_status(_pid, "run", "done", "Run complete")
+        threading.Thread(target=_watch, args=(proc, pid), daemon=True).start()
+        return {"status": "started"}
+    except Exception as e:
+        _re_write_status(pid, "run", "error", str(e))
+        raise HTTPException(500, f"Failed to start agent: {e}")
+
+
+@app.get("/realestate/{pid}/search-history")
+def re_search_history(pid: str):
+    _re_get_project(pid)
+    history_path = _re_project_dir(pid) / "data" / "search_history.json"
+    if not history_path.exists():
+        return {"queries": {}, "total": 0}
+    try:
+        with open(history_path) as f:
+            history = json.load(f)
+        return {"queries": history, "total": len(history)}
+    except Exception:
+        return {"queries": {}, "total": 0}
+
+
+@app.delete("/realestate/{pid}/search-history", status_code=204)
+def re_clear_search_history(pid: str):
+    _re_get_project(pid)
+    history_path = _re_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists():
+        history_path.unlink()
+    return
+
+
+@app.post("/realestate/{pid}/stop")
+def re_stop(pid: str):
+    _re_get_project(pid)
+    proc = _re_procs.pop(pid, None)
+    if proc is not None:
+        try:
+            proc.terminate()
+        except Exception:
+            pass
+    _re_write_status(pid, "run", "done", "Stopped by user")
+    return {"status": "stopped"}
+
+
+@app.patch("/realestate/{pid}/config")
+def re_patch_config(pid: str, payload: dict):
+    _re_get_project(pid)
+    cfg_path, _, _ = _re_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Config not found. Complete onboarding first.")
+    with open(cfg_path) as f:
+        cfg = json.load(f)
+    cfg.update(payload)
+    with open(cfg_path, "w") as f:
+        json.dump(cfg, f, indent=2)
+    return {"ok": True}
+
+
+@app.get("/realestate/{pid}/config/status")
+def re_config_status(pid: str):
+    _re_get_project(pid)
+    cfg_path, _, _ = _re_project_paths(pid)
+    return {"configured": cfg_path.exists()}
+
+
+@app.get("/realestate/{pid}/config")
+def re_config_get(pid: str):
+    _re_get_project(pid)
+    cfg_path, _, _ = _re_project_paths(pid)
+    if not cfg_path.exists():
+        raise HTTPException(404, "Not configured yet")
+    with open(cfg_path) as f:
+        return json.load(f)
+
+
+@app.post("/realestate/{pid}/config")
+def re_config_save(pid: str, data: dict):
+    _re_get_project(pid)
+    cfg_path, _, _ = _re_project_paths(pid)
+    cfg_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(cfg_path, "w") as f:
+        json.dump(data, f, indent=2)
+    history_path = _re_project_dir(pid) / "data" / "search_history.json"
+    if history_path.exists():
+        history_path.unlink()
+    return {"ok": True}
+
+
+@app.websocket("/realestate/ws/onboard")
+async def re_onboard(ws: WebSocket, project_id: str = ""):
+    """
+    Onboarding chat for a real estate project.
+    Gathers property requirements through natural conversation, then generates config.
+    """
+    import requests as _requests
+
+    await ws.accept()
+
+    if not project_id:
+        await ws.send_text(json.dumps({"type": "error", "content": "project_id query parameter is required"}))
+        await ws.close()
+        return
+
+    try:
+        _re_get_project(project_id)
+    except HTTPException:
+        await ws.send_text(json.dumps({"type": "error", "content": f"Project not found: {project_id}"}))
+        await ws.close()
+        return
+
+    cfg_path, _, _ = _re_project_paths(project_id)
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def ollama_chat(messages: list, system: str) -> str:
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        resp = _requests.post(OLLAMA_URL, json=payload, timeout=120)
+        resp.raise_for_status()
+        return resp.json()["message"]["content"].strip()
+
+    SYSTEM = """You are a real estate search assistant helping a client set up their property search.
+Your job is to gather enough information to configure an automated property search agent.
+
+Ask questions ONE AT A TIME in a natural, friendly conversation. Cover these areas:
+1. Are they looking to BUY or RENT? (or both?)
+2. What city/cities are they looking in?
+3. What specific areas/localities do they prefer?
+4. What's their budget range? (for buy: in lakhs/crores/dollars; for rent: monthly)
+5. What property type? (apartment/flat, villa/house, studio, penthouse)
+6. How many bedrooms? (1 BHK, 2 BHK, 3 BHK, etc.)
+7. Must-have features? (parking, gym, gated community, ready-to-move, near metro, etc.)
+8. Any deal breakers? (no ground floor, no under-construction, minimum area, etc.)
+9. Any other preferences? (facing direction, floor preference, furnished/semi-furnished, etc.)
+
+Once you have enough detail (usually 5-8 exchanges), respond with ONLY the JSON block shown below.
+
+CRITICAL RULE: If the user says ANYTHING like "go ahead", "generate", "done", "create it", "proceed", "looks good",
+"that's enough", "force generate", or sends [FORCE_GENERATE] — you MUST immediately output the <CONFIG>...</CONFIG>
+block below with sensible defaults for anything not yet discussed. NEVER respond with prose in these cases.
+
+<CONFIG>
+{
+  "agent_name": "Real Estate Agent — [City/Area]",
+  "listing_type": "buy|rent|both",
+  "budget_range": "e.g. ₹40 Lac - ₹80 Lac or $2000-$3000/month",
+  "bedrooms": "e.g. 2-3 BHK",
+  "location_preference": "City — Area1, Area2, Area3",
+  "additional_requirements": "Any other specific requirements mentioned by the client",
+  "must_haves": [
+    "Specific required feature — be concrete",
+    "..."
+  ],
+  "nice_to_haves": [
+    "Desired but not required feature",
+    "..."
+  ],
+  "deal_breakers": [
+    "Things that would disqualify a listing",
+    "..."
+  ],
+  "result_schema": {
+    "property_types": ["apartment", "flat", "villa", "house", "penthouse", "studio", "plot", "other"],
+    "localities": ["Area1", "Area2", "Area3", "other"]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 3
+  },
+  "search_queries": [
+    {
+      "signal": "signal_name",
+      "queries": ["specific search query with location, type, budget", "..."]
+    }
+  ],
+  "search_channels": ["99acres", "magicbricks", "housing", "google"],
+  "max_results_per_query": 5,
+  "search_geo": "in"
+}
+</CONFIG>
+
+Rules for search_queries:
+- Queries run verbatim on real estate portals. Make them specific — include property type, bedrooms, location, budget.
+- Bad: "flat buy Mumbai". Good: "2 BHK flat for sale Andheri West Mumbai under 1 crore ready to move".
+- Generate 3-5 signal groups covering: direct listings, resale properties, new projects, rental listings.
+- Each group should have 3-6 queries with variations in area, price range, property type.
+
+For search_channels — choose from:
+  "99acres"       → 99acres.com (India's largest property portal)
+  "magicbricks"   → MagicBricks.com (popular Indian portal)
+  "housing"       → Housing.com (Indian portal with good UI)
+  "nobroker"      → NoBroker.in (no brokerage platform, India)
+  "zillow"        → Zillow.com (US real estate)
+  "realtor"       → Realtor.com (US real estate)
+  "propertyguru"  → PropertyGuru.com (Southeast Asia)
+  "rightmove"     → Rightmove.co.uk (UK real estate)
+  "news"          → Google News (for new project launches, market trends)
+  "google"        → Plain Google search (broad fallback)
+
+Pick 3-4 channels most relevant to the search geography.
+Example for India: ["99acres", "magicbricks", "housing", "google"]
+Example for US: ["zillow", "realtor", "google"]
+Example for UK: ["rightmove", "google"]
+Example for SEA: ["propertyguru", "google"]
+
+For search_geo, use the 2-letter country code: "in" for India, "us" for US, "gb" for UK, "sg" for Singapore, etc.
+"""
+
+    history: list[dict] = []
+
+    init_msg = "Hello, I'd like to find a property."
+    opening_text = await asyncio.get_event_loop().run_in_executor(
+        None, lambda: ollama_chat([{"role": "user", "content": init_msg}], SYSTEM)
+    )
+    history.append({"role": "user",      "content": init_msg})
+    history.append({"role": "assistant", "content": opening_text})
+    await ws.send_text(json.dumps({"type": "agent", "content": opening_text}))
+
+    FORCE_TRIGGER_WORDS = {"[force_generate]"}
+
+    async def _save_cfg(raw_json: str):
+        cfg = json.loads(raw_json)
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(cfg_path, "w") as f:
+            json.dump(cfg, f, indent=2)
+        await ws.send_text(json.dumps({"type": "config_ready", "content": cfg}))
+        return cfg
+
+    async def _force_generate():
+        force_prompt = (
+            "Generate the complete configuration JSON right now. "
+            "Use sensible defaults for any fields not yet discussed. "
+            "Output ONLY the <CONFIG>...</CONFIG> block — no other text."
+        )
+        for attempt in range(3):
+            h = list(history)
+            h.append({"role": "user", "content": force_prompt})
+            gen_reply = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: ollama_chat(h, SYSTEM)
+            )
+            history.append({"role": "user",      "content": force_prompt})
+            history.append({"role": "assistant", "content": gen_reply})
+
+            if "<CONFIG>" in gen_reply and "</CONFIG>" in gen_reply:
+                raw_cfg = gen_reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    await _save_cfg(raw_cfg)
+                    return True
+                except json.JSONDecodeError as e:
+                    force_prompt = (
+                        f"Syntax error in your JSON: {e}. "
+                        "Output ONLY the corrected <CONFIG>...</CONFIG> block."
+                    )
+                    continue
+            force_prompt = (
+                "You must output the <CONFIG>...</CONFIG> block NOW. "
+                "No explanations, no questions — just the JSON block."
+            )
+        await ws.send_text(json.dumps({
+            "type": "agent",
+            "content": (
+                "I'm having trouble generating the config automatically. "
+                "Please click 'Set up manually' to fill in the details directly."
+            ),
+        }))
+        return False
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            user_text = msg.get("content", "").strip()
+            force = msg.get("force", False)
+            if not user_text:
+                continue
+
+            if force or any(t in user_text.lower() for t in FORCE_TRIGGER_WORDS):
+                history.append({"role": "user", "content": user_text})
+                await _force_generate()
+                continue
+
+            history.append({"role": "user", "content": user_text})
+
+            reply = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: ollama_chat(history, SYSTEM)
+            )
+            history.append({"role": "assistant", "content": reply})
+
+            if "<CONFIG>" in reply and "</CONFIG>" in reply:
+                raw_cfg = reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    await _save_cfg(raw_cfg)
+                except json.JSONDecodeError:
+                    await _force_generate()
+            else:
+                await ws.send_text(json.dumps({"type": "agent", "content": reply}))
+
+    except WebSocketDisconnect:
+        pass
+
+
+@app.websocket("/realestate/ws/refine")
+async def re_refine(ws: WebSocket, project_id: str = ""):
+    """
+    Requirement refinement chat for a real estate project.
+    Allows client to adjust search criteria based on results.
+    """
+    import requests as _requests
+
+    await ws.accept()
+
+    if not project_id:
+        await ws.send_text(json.dumps({"type": "error", "content": "project_id query parameter is required"}))
+        await ws.close()
+        return
+
+    try:
+        _re_get_project(project_id)
+    except HTTPException:
+        await ws.send_text(json.dumps({"type": "error", "content": f"Project not found: {project_id}"}))
+        await ws.close()
+        return
+
+    cfg_path, data_path, _ = _re_project_paths(project_id)
+
+    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_MODEL = "llama3.2"
+
+    def ollama_chat(messages: list, system: str) -> str:
+        payload = {
+            "model": OLLAMA_MODEL,
+            "stream": False,
+            "messages": [{"role": "system", "content": system}] + messages,
+        }
+        resp = _requests.post(OLLAMA_URL, json=payload, timeout=120)
+        resp.raise_for_status()
+        return resp.json()["message"]["content"].strip()
+
+    try:
+        with open(cfg_path) as f:
+            current_cfg = json.load(f)
+    except Exception:
+        await ws.send_text(json.dumps({"type": "error", "content": "No config found. Please complete onboarding first."}))
+        return
+
+    listings_sample = []
+    starred_listings = []
+    if data_path.exists():
+        try:
+            with open(data_path) as f:
+                all_listings = json.load(f)
+            listings_list = list(all_listings.values())
+            starred_listings = [l for l in listings_list if l.get("starred")]
+            listings_sample = listings_list[:6]
+        except Exception:
+            pass
+
+    listings_summary = "\n".join([
+        f"- {l.get('property_name','?')} | {l.get('locality','?')} | {l.get('price','?')} | {l.get('bedrooms','?')} | score={l.get('match_score','?')} | reason={l.get('match_reason','?')[:80]}"
+        for l in listings_sample
+    ]) or "No listings found yet."
+
+    starred_summary = "\n".join([
+        f"- {l.get('property_name','?')} | {l.get('locality','?')} | {l.get('price','?')} | {l.get('bedrooms','?')} | snippet={l.get('raw_snippet','')[:120]}"
+        for l in starred_listings
+    ]) if starred_listings else ""
+
+    current_queries = "\n".join([
+        f"  [{g['signal']}]: " + " / ".join(g['queries'])
+        for g in current_cfg.get("search_queries", [])
+    ])
+
+    starred_section = f"""
+The client has marked these listings as favorites (starred). Find MORE properties like these:
+{starred_summary}
+""" if starred_summary else ""
+
+    additional_req_esc = current_cfg.get("additional_requirements", "").replace('"', '\\"')
+    current_must_haves = json.dumps(current_cfg.get("must_haves", []), ensure_ascii=False)
+    current_nice_to_haves = json.dumps(current_cfg.get("nice_to_haves", []), ensure_ascii=False)
+    current_deal_breakers = json.dumps(current_cfg.get("deal_breakers", []), ensure_ascii=False)
+    current_prop_types = json.dumps(current_cfg.get("result_schema", {}).get("property_types", []), ensure_ascii=False)
+    current_localities = json.dumps(current_cfg.get("result_schema", {}).get("localities", []), ensure_ascii=False)
+    current_queries_json = json.dumps(current_cfg.get("search_queries", []), indent=4, ensure_ascii=False)
+    current_thresholds = json.dumps(current_cfg.get("score_thresholds", {"hot_min": 8, "warm_min": 5, "save_min": 3}), ensure_ascii=False)
+    current_channels = json.dumps(current_cfg.get("search_channels", ["99acres", "magicbricks", "housing", "google"]), ensure_ascii=False)
+
+    SYSTEM = f"""You are a real estate search strategist making targeted corrections to a property search agent's config.
+
+CURRENT CONFIG (preserve everything the client has NOT complained about):
+- Listing type: {current_cfg.get('listing_type', 'buy')}
+- Budget range: {current_cfg.get('budget_range', '')}
+- Bedrooms: {current_cfg.get('bedrooms', '')}
+- Location preference: {current_cfg.get('location_preference', '')}
+- Additional requirements: {current_cfg.get('additional_requirements', '')}
+- Must-haves: {current_must_haves}
+- Nice-to-haves: {current_nice_to_haves}
+- Deal breakers: {current_deal_breakers}
+- Property types: {current_prop_types}
+- Localities: {current_localities}
+- Score thresholds: {current_thresholds}
+- Search channels: {current_channels}
+- Search geo: {current_cfg.get('search_geo', '')}
+- Max results per query: {current_cfg.get('max_results_per_query', 5)}
+
+Current search queries:
+{current_queries}
+
+Sample of listings found so far:
+{listings_summary}
+{starred_section}
+
+INSTRUCTIONS:
+- The client is describing a SPECIFIC issue with current results — do NOT rewrite everything.
+- Only change fields directly relevant to the client's feedback.
+- If queries are too generic → update search_queries only.
+- If wrong area → update localities and search_queries.
+- If wrong price range → update budget_range and search_queries.
+- If wrong property type → update must_haves and search_queries.
+- You may ask AT MOST ONE short clarifying question — only if genuinely needed.
+
+When ready, output ONLY this exact block:
+
+<CONFIG>
+{{
+  "agent_name": "{current_cfg.get('agent_name', '')}",
+  "listing_type": "{current_cfg.get('listing_type', 'buy')}",
+  "budget_range": "{current_cfg.get('budget_range', '')}",
+  "bedrooms": "{current_cfg.get('bedrooms', '')}",
+  "location_preference": "{current_cfg.get('location_preference', '')}",
+  "additional_requirements": "{additional_req_esc}",
+  "must_haves": {current_must_haves},
+  "nice_to_haves": {current_nice_to_haves},
+  "deal_breakers": {current_deal_breakers},
+  "result_schema": {{
+    "property_types": {current_prop_types},
+    "localities": {current_localities}
+  }},
+  "score_thresholds": {current_thresholds},
+  "search_queries": {current_queries_json},
+  "search_channels": {current_channels},
+  "max_results_per_query": {current_cfg.get('max_results_per_query', 5)},
+  "search_geo": "{current_cfg.get('search_geo', '')}"
+}}
+</CONFIG>
+
+The values above are DEFAULTS. Only edit fields the client's feedback requires.
+"""
+
+    history: list[dict] = []
+
+    await ws.send_text(json.dumps({
+        "type": "agent",
+        "content": "Sure — what would you like to change about the current search? I'll make targeted adjustments while keeping everything that's working.",
+    }))
+
+    try:
+        while True:
+            raw = await ws.receive_text()
+            msg = json.loads(raw)
+            user_text = msg.get("content", "").strip()
+            if not user_text:
+                continue
+
+            history.append({"role": "user", "content": user_text})
+
+            try:
+                h = list(history)
+                reply = await asyncio.wait_for(
+                    asyncio.get_event_loop().run_in_executor(
+                        None, lambda: ollama_chat(h, SYSTEM)
+                    ),
+                    timeout=180,
+                )
+            except asyncio.TimeoutError:
+                await ws.send_text(json.dumps({
+                    "type": "agent",
+                    "content": "The model took too long to respond. Please try again with a shorter message.",
+                }))
+                continue
+            except Exception as e:
+                await ws.send_text(json.dumps({
+                    "type": "agent",
+                    "content": f"Error calling the model: {e}. Is Ollama running?",
+                }))
+                continue
+
+            history.append({"role": "assistant", "content": reply})
+
+            if "<CONFIG>" in reply and "</CONFIG>" in reply:
+                raw_cfg = reply.split("<CONFIG>")[1].split("</CONFIG>")[0].strip()
+                try:
+                    new_cfg = json.loads(raw_cfg)
+                    with open(cfg_path, "w") as f:
+                        json.dump(new_cfg, f, indent=2)
+                    await ws.send_text(json.dumps({"type": "config_ready", "content": new_cfg}))
+                except json.JSONDecodeError as parse_err:
+                    fix_prompt = (
+                        f"The JSON you produced has a syntax error: {parse_err}. "
+                        "Please output ONLY the corrected JSON between <CONFIG> and </CONFIG> tags."
                     )
                     history.append({"role": "user", "content": fix_prompt})
                     retry_reply = await asyncio.get_event_loop().run_in_executor(

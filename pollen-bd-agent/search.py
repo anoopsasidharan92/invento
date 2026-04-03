@@ -13,8 +13,12 @@ Supported channels (in priority order configured by user):
 """
 
 import os
+import json
+import datetime
 import requests
 import time
+from pathlib import Path
+from typing import Optional
 
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
 
@@ -113,15 +117,45 @@ def _mock_result(query: str, channel: str) -> dict:
     }
 
 
-def search_leads(cfg: dict) -> list[dict]:
+def _load_search_history(data_dir: Path) -> dict:
+    """Load search history: {channel::query -> last_run_iso}."""
+    path = data_dir / "search_history.json"
+    if path.exists():
+        try:
+            with open(path) as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_search_history(data_dir: Path, history: dict):
+    path = data_dir / "search_history.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(history, f, indent=2)
+
+
+def search_leads(cfg: dict, data_dir: Optional[Path] = None) -> dict:
     """
     Run all configured queries across the prioritised channel list.
     Channels are tried in priority order; results from higher-priority channels
     come first, giving the qualifier the best signals earliest.
+
+    Tracks executed queries in data/search_history.json so repeated runs
+    skip queries that have already been searched. Pass force_all=True in
+    config to bypass this.
+
+    Returns a dict with:
+      - results: list of search result dicts
+      - total_queries: total number of channel+query combos
+      - skipped: how many were skipped (already in history)
+      - all_exhausted: True when every query was skipped
     """
     search_queries        = cfg["search_queries"]
     max_results_per_query = cfg.get("max_results_per_query", 5)
     search_geo            = cfg.get("search_geo", "in")
+    force_all             = cfg.get("force_all_queries", False)
 
     # Priority-ordered channel list from config, fallback to defaults
     channels: list[str] = cfg.get("search_channels", DEFAULT_CHANNELS)
@@ -130,8 +164,16 @@ def search_leads(cfg: dict) -> list[dict]:
     if not channels:
         channels = DEFAULT_CHANNELS
 
+    # Load search history to skip previously executed queries
+    history: dict = {}
+    if data_dir and not force_all:
+        history = _load_search_history(data_dir)
+
     seen_urls: set[str] = set()
     all_results: list[dict] = []
+    now = datetime.datetime.now().isoformat()
+    skipped = 0
+    total_queries = 0
 
     for channel in channels:
         ch_label = CHANNEL_CONFIG[channel]["label"]
@@ -139,6 +181,12 @@ def search_leads(cfg: dict) -> list[dict]:
         for signal_group in search_queries:
             signal = signal_group["signal"]
             for query in signal_group["queries"]:
+                total_queries += 1
+                history_key = f"{channel}::{query}"
+                if history_key in history and not force_all:
+                    skipped += 1
+                    continue
+
                 results = search_channel(query, channel, max_results_per_query, search_geo)
                 for r in results:
                     url = r.get("url", "")
@@ -146,6 +194,21 @@ def search_leads(cfg: dict) -> list[dict]:
                         seen_urls.add(url)
                         r["signal_hint"] = signal
                         all_results.append(r)
+
+                # Record this query as executed
+                history[history_key] = now
                 time.sleep(0.5)
 
-    return all_results
+    if skipped:
+        print(f"  [search] Skipped {skipped}/{total_queries} previously executed queries (use force_all_queries to re-run)")
+
+    # Persist updated history
+    if data_dir:
+        _save_search_history(data_dir, history)
+
+    return {
+        "results": all_results,
+        "total_queries": total_queries,
+        "skipped": skipped,
+        "all_exhausted": skipped == total_queries and total_queries > 0,
+    }

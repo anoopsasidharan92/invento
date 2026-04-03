@@ -1,0 +1,64 @@
+{
+  "agent_name": "Pollen Direct BD Automation",
+  "sender_name": "Anoop Sasidharan",
+  "sender_company": "Pollen Tech/Pollen Direct",
+  "sender_description": "Customer Success Director",
+  "qualifier_context": "Pollen Direct helps FMCG brands recover maximum value from excess inventory \u2014 faster than a broker, safer than open-market dumping, and with full visibility into where the stock goes. We're the trusted marketplace for liquidation and clearance of brand-name stock.",
+  "ideal_customer_profile": "FMCG/beauty resellers and distributors, liquidation and discount traders, independent pharmacy chains, beauty supply stores, and sundry/grocery wholesalers in Singapore, Malaysia, Indonesia, Thailand, Philippines, and India",
+  "what_we_offer": "A marketplace for the B2B liquidation buyers where they can buy products in bulk in various currencies. They can offer if the price is not good enough",
+  "strong_signals": [
+    "Companies actively sourcing discounted or clearance FMCG stock on B2B platforms",
+    "FMCG distributor warehouse clearance"
+  ],
+  "weak_signals": [
+    "Social media posts about 'FMCG surplus' without concrete details"
+  ],
+  "search_queries": [
+    {
+      "signal": "buyer_sourcing_discounted_stock",
+      "queries": [
+        "FMCG liquidation singapore",
+        "beauty clearance indonesia",
+        "FMCG distributor malaysia"
+      ]
+    },
+    {
+      "signal": "buyer_expanding_into_new_geographies",
+      "queries": [
+        "FMCG distributor philippines",
+        "beauty import india"
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news"
+  ],
+  "search_geo": "Singapore, Malaysia, Indonesia, Thailand, Philippines, India",
+  "max_results_per_query": 5,
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "FMCG/beauty"
+    ],
+    "geographies": [
+      "Singapore",
+      "Malaysia",
+      "Indonesia",
+      "Thailand",
+      "Philippines",
+      "India"
+    ],
+    "signal_types": [
+      "buyer_signal",
+      "buyer_sourcing_discounted_stock",
+      "buyer_expanding_into_new_geographies"
+    ]
+  },
+  "batch_size": 200
+}

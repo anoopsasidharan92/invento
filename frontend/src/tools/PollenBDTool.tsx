@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   RefreshCw, Play, X, ExternalLink, Copy, Check, Send,
-  Star, Trash2, Plus, FolderOpen, ArrowLeft, Square, Download,
+  Star, Trash2, Plus, FolderOpen, ArrowLeft, Square, Download, Pencil,
 } from "lucide-react";
 
 const API    = "http://localhost:8000";
@@ -47,7 +47,7 @@ interface AgentContext {
   config: { agent_name: string; sender_name: string; sender_company: string; sender_description: string; qualifier_context: string; ideal_customer_profile?: string; what_we_offer?: string };
   strong_signals: string[];
   weak_signals: string[];
-  search_queries: { signal: string; queries: string[] }[];
+  search_queries: { signal: string | string[]; queries: string[] }[];
   result_schema: { lead_name_field: string; categories: string[]; geographies: string[]; signal_types: string[] };
   score_thresholds: { hot_min: number; warm_min: number; save_min: number };
   qualifier_prompt: string;
@@ -70,28 +70,204 @@ function fmtDate(iso: string) {
   return new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+/** Light-surface pills with dark label text — readable on the light BD Agent dashboard */
 const PRIORITY_BADGE: Record<string, string> = {
-  hot:  "text-orange-400 bg-orange-950 border-orange-800",
-  warm: "text-yellow-400 bg-yellow-950 border-yellow-800",
-  cold: "text-gray-400 bg-gray-900 border-gray-700",
+  hot:  "text-orange-950 bg-orange-100 border-orange-200",
+  warm: "text-amber-950 bg-amber-100 border-amber-200",
+  cold: "text-slate-700 bg-slate-100 border-slate-200",
 };
 const PRIORITY_BORDER: Record<string, string> = {
   hot:  "border-l-orange-500",
-  warm: "border-l-yellow-400",
-  cold: "border-l-gray-600",
+  warm: "border-l-amber-500",
+  cold: "border-l-slate-400",
 };
+const SIGNAL_BADGE = "text-indigo-950 bg-indigo-50 border-indigo-200";
+const STATUS_BADGE: Record<string, string> = {
+  new:       "text-blue-900 bg-blue-50 border-blue-200",
+  reviewed:  "text-amber-950 bg-amber-50 border-amber-200",
+  contacted: "text-emerald-950 bg-emerald-50 border-emerald-200",
+  archived:  "text-slate-600 bg-slate-100 border-slate-200",
+};
+const CATEGORY_BADGE = "text-ui-text bg-zinc-100 border-zinc-200";
 const CHANNEL_BADGE: Record<string, string> = {
-  linkedin:  "text-blue-300 bg-blue-950 border-blue-700",
-  reddit:    "text-orange-300 bg-orange-950 border-orange-700",
-  instagram: "text-pink-300 bg-pink-950 border-pink-700",
-  facebook:  "text-indigo-300 bg-indigo-950 border-indigo-700",
-  news:      "text-purple-300 bg-purple-950 border-purple-700",
-  google:    "text-green-300 bg-green-950 border-green-700",
+  linkedin:  "text-sky-950 bg-sky-100 border-sky-200",
+  reddit:    "text-orange-950 bg-orange-100 border-orange-200",
+  instagram: "text-pink-950 bg-pink-100 border-pink-200",
+  facebook:  "text-indigo-950 bg-indigo-100 border-indigo-200",
+  news:      "text-violet-950 bg-violet-100 border-violet-200",
+  google:    "text-emerald-950 bg-emerald-100 border-emerald-200",
 };
+
+function formatSignalLabel(raw: string | string[]): string {
+  const s = Array.isArray(raw) ? raw.join(", ") : (raw ?? "");
+  if (!s) return "—";
+  return s.replace(/_/g, " ").replace(/^string:\s*/i, "").trim();
+}
 const CHANNEL_LABEL: Record<string, string> = {
   linkedin: "LinkedIn", reddit: "Reddit", instagram: "Instagram",
   facebook: "Facebook", news: "News", google: "Google",
 };
+
+// ── Add Company Modal ──────────────────────────────────────────────────────────
+
+interface ManualLeadResult {
+  saved: boolean;
+  below_threshold: boolean;
+  save_min: number;
+  lead: Lead;
+}
+
+function AddCompanyModal({
+  projectId,
+  onClose,
+  onAdded,
+}: {
+  projectId: string;
+  onClose: () => void;
+  onAdded: (lead: Lead) => void;
+}) {
+  const [companyName, setCompanyName] = useState("");
+  const [loading, setLoading]         = useState(false);
+  const [result, setResult]           = useState<ManualLeadResult | null>(null);
+  const [error, setError]             = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => { inputRef.current?.focus(); }, []);
+
+  const handleSubmit = async (forceAdd = false) => {
+    const name = companyName.trim();
+    if (!name) return;
+    setLoading(true);
+    setError("");
+    setResult(null);
+    try {
+      const r = await fetch(`${API}/pollen/${projectId}/leads/manual`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ company_name: name, force_add: forceAdd }),
+      });
+      if (!r.ok) {
+        const e = await r.json().catch(() => ({}));
+        setError(e.detail ?? "Something went wrong");
+        return;
+      }
+      const data: ManualLeadResult = await r.json();
+      setResult(data);
+      if (data.saved) {
+        onAdded(data.lead);
+      }
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const priorityColor: Record<string, string> = {
+    hot: "text-orange-600", warm: "text-amber-600", cold: "text-slate-500",
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-ui-card border border-ui-border rounded-xl shadow-xl w-full max-w-lg">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ui-border">
+          <h2 className="text-sm font-semibold text-ui-text">Add company manually</h2>
+          <button onClick={onClose} className="text-ui-accent hover:text-ui-text transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="px-5 py-4 space-y-4">
+          {!result && (
+            <>
+              <p className="text-xs text-ui-accent">
+                Enter a company name. The agent will search for it, score it against your ICP, and add it to your leads if it qualifies.
+              </p>
+              <div className="flex gap-2">
+                <input
+                  ref={inputRef}
+                  value={companyName}
+                  onChange={e => setCompanyName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleSubmit(); }}
+                  placeholder="e.g. Acme Corp"
+                  className="flex-1 bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text placeholder:text-ui-accent focus:outline-none focus:border-gray-400"
+                  disabled={loading}
+                />
+                <button
+                  onClick={() => handleSubmit()}
+                  disabled={loading || !companyName.trim()}
+                  className="px-4 py-2 rounded-lg bg-ui-text text-white text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-1.5"
+                >
+                  {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                  {loading ? "Checking…" : "Check & add"}
+                </button>
+              </div>
+              {error && <p className="text-xs text-red-500">{error}</p>}
+            </>
+          )}
+
+          {result && (
+            <div className="space-y-3">
+              {/* Score card */}
+              <div className={`border rounded-lg p-4 ${result.saved ? "border-green-300 bg-green-50" : "border-amber-300 bg-amber-50"}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm font-semibold text-ui-text">
+                    {result.lead.brand_name ?? result.lead.company_name ?? companyName}
+                  </span>
+                  <span className={`text-xs font-bold ${priorityColor[result.lead.priority] ?? "text-slate-500"}`}>
+                    {result.lead.priority?.toUpperCase()} · {result.lead.fit_score}/10
+                  </span>
+                </div>
+                <p className="text-xs text-ui-accent">{result.lead.fit_reason}</p>
+                {result.lead.category && (
+                  <p className="text-[11px] text-ui-accent mt-1">{result.lead.category} · {result.lead.country}</p>
+                )}
+              </div>
+
+              {result.saved ? (
+                <div className="flex items-center gap-2 text-xs text-green-700 font-medium">
+                  <Check className="w-4 h-4" /> Added to your leads list
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-xs text-amber-700">
+                    Score {result.lead.fit_score}/10 is below your save threshold ({result.save_min}). This company may not fit your ICP well.
+                  </p>
+                  <p className="text-xs text-ui-accent">
+                    You can still add it — manually added leads act as ICP examples that help refine future searches.
+                  </p>
+                  <button
+                    onClick={() => handleSubmit(true)}
+                    disabled={loading}
+                    className="px-3 py-1.5 rounded-lg border border-amber-400 text-amber-700 text-xs font-medium hover:bg-amber-100 transition-colors disabled:opacity-40"
+                  >
+                    Add anyway
+                  </button>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { setResult(null); setCompanyName(""); setTimeout(() => inputRef.current?.focus(), 50); }}
+                  className="px-3 py-1.5 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text transition-colors"
+                >
+                  Check another
+                </button>
+                <button
+                  onClick={onClose}
+                  className="px-3 py-1.5 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text transition-colors"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ── Project Selector ───────────────────────────────────────────────────────────
 
@@ -101,17 +277,38 @@ function ProjectSelector({
   onSelect,
   onRefresh,
   onDelete,
+  onRename,
 }: {
   projects: Project[];
   loading: boolean;
   onSelect: (project: Project) => void;
   onRefresh: () => void;
   onDelete: (pid: string) => void;
+  onRename: (pid: string, name: string) => Promise<void>;
 }) {
-  const [creating, setCreating] = useState(false);
-  const [newName, setNewName]   = useState("");
-  const [saving, setSaving]     = useState(false);
+  const [creating, setCreating]     = useState(false);
+  const [newName, setNewName]       = useState("");
+  const [saving, setSaving]         = useState(false);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameVal, setRenameVal]   = useState("");
+  const renameRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (renamingId) renameRef.current?.focus();
+  }, [renamingId]);
+
+  const startRename = (p: Project, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenamingId(p.id);
+    setRenameVal(p.name);
+  };
+
+  const commitRename = async (pid: string) => {
+    const name = renameVal.trim();
+    if (name) await onRename(pid, name);
+    setRenamingId(null);
+  };
 
   useEffect(() => {
     if (creating) inputRef.current?.focus();
@@ -171,38 +368,77 @@ function ProjectSelector({
                 key={p.id}
                 className="bg-ui-card border border-ui-border hover:border-gray-400 rounded-xl p-5 text-left transition-colors group relative"
               >
-                <button
-                  onClick={() => onSelect(p)}
-                  className="w-full text-left"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-3 pr-7">
-                    <span className="font-semibold text-ui-text group-hover:text-white transition-colors truncate">
-                      {p.name}
-                    </span>
-                    <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full border font-medium ${
-                      p.configured
-                        ? "text-green-400 bg-green-950 border-green-800"
-                        : "text-yellow-400 bg-yellow-950 border-yellow-800"
-                    }`}>
-                      {p.configured ? "Ready" : "Setup needed"}
-                    </span>
+                {renamingId === p.id ? (
+                  <div className="flex gap-2 mb-3" onClick={e => e.stopPropagation()}>
+                    <input
+                      ref={renameRef}
+                      value={renameVal}
+                      onChange={e => setRenameVal(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") commitRename(p.id);
+                        if (e.key === "Escape") setRenamingId(null);
+                      }}
+                      onBlur={() => commitRename(p.id)}
+                      className="flex-1 bg-ui-bg border border-ui-border rounded-lg px-3 py-1.5 text-sm text-ui-text"
+                    />
+                    <button
+                      onMouseDown={e => { e.preventDefault(); commitRename(p.id); }}
+                      className="p-1.5 rounded-lg bg-ui-text text-white text-xs"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onMouseDown={e => { e.preventDefault(); setRenamingId(null); }}
+                      className="p-1.5 rounded-lg border border-ui-border text-ui-accent"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
                   </div>
-                  <p className="text-xs text-ui-accent">
-                    Created {fmtDate(p.created_at)}
-                  </p>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (confirm(`Delete project "${p.name}"? This cannot be undone.`)) {
-                      onDelete(p.id);
-                    }
-                  }}
-                  title="Delete project"
-                  className="absolute top-4 right-4 p-1.5 rounded-lg text-ui-accent hover:text-red-400 hover:bg-red-950/50 opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
+                ) : (
+                  <button
+                    onClick={() => onSelect(p)}
+                    className="w-full text-left"
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-3 pr-14">
+                      <span className="font-semibold text-ui-text group-hover:text-white transition-colors truncate">
+                        {p.name}
+                      </span>
+                      <span className={`flex-shrink-0 text-[10px] px-2 py-0.5 rounded-full border font-semibold ${
+                        p.configured
+                          ? "text-green-900 bg-green-100 border-green-200"
+                          : "text-amber-950 bg-amber-50 border-amber-200"
+                      }`}>
+                        {p.configured ? "Ready" : "Setup needed"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-ui-accent">
+                      Created {fmtDate(p.created_at)}
+                    </p>
+                  </button>
+                )}
+                {renamingId !== p.id && (
+                  <>
+                    <button
+                      onClick={e => startRename(p, e)}
+                      title="Rename project"
+                      className="absolute top-4 right-11 p-1.5 rounded-lg text-ui-accent hover:text-ui-text hover:bg-ui-border opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (confirm(`Delete project "${p.name}"? This cannot be undone.`)) {
+                          onDelete(p.id);
+                        }
+                      }}
+                      title="Delete project"
+                      className="absolute top-4 right-4 p-1.5 rounded-lg text-ui-accent hover:text-red-400 hover:bg-red-950/50 opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -682,10 +918,35 @@ function StatCard({ label, value, accent }: { label: string; value: number | str
   );
 }
 
-function Badge({ children, className }: { children: React.ReactNode; className?: string }) {
+function Badge({ children, className, title }: { children: React.ReactNode; className?: string; title?: string }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${className}`}>
+    <span
+      title={title}
+      className={`inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-semibold border leading-snug ${className}`}
+    >
       {children}
+    </span>
+  );
+}
+
+function CategoryBadges({ category }: { category: string }) {
+  const raw = category?.trim() || "";
+  if (!raw) return <Badge className={CATEGORY_BADGE}>—</Badge>;
+  const parts = raw.split("|").map(s => s.trim()).filter(Boolean);
+  if (parts.length <= 1) {
+    return (
+      <Badge className={`${CATEGORY_BADGE} max-w-[min(280px,40vw)] whitespace-normal text-left font-medium`} title={raw}>
+        {raw}
+      </Badge>
+    );
+  }
+  return (
+    <span className="inline-flex flex-col gap-1 items-start max-w-[min(280px,40vw)]">
+      {parts.map((p, i) => (
+        <Badge key={i} className={`${CATEGORY_BADGE} whitespace-normal text-left font-medium`} title={p}>
+          {p}
+        </Badge>
+      ))}
     </span>
   );
 }
@@ -770,7 +1031,7 @@ function DetailPanel({ lead, onClose, onSave, onDelete }: {
           <button
             onClick={() => { const next = !starred; setStarred(next); onSave(lead.id, { starred: next }); }}
             title={starred ? "Remove from good examples" : "Mark as great lead — improves future search"}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${starred ? "text-yellow-400 bg-yellow-950 border border-yellow-800" : "bg-ui-bg text-ui-accent hover:text-yellow-400"}`}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg border transition-colors ${starred ? "text-yellow-900 bg-yellow-100 border-yellow-300" : "border-transparent bg-ui-bg text-ui-accent hover:text-yellow-800 hover:bg-yellow-50"}`}
           >
             <Star className={`w-4 h-4 ${starred ? "fill-yellow-400" : ""}`} />
           </button>
@@ -789,9 +1050,9 @@ function DetailPanel({ lead, onClose, onSave, onDelete }: {
       <div className="flex-1 p-5 space-y-5">
         <div className="flex flex-wrap gap-1.5">
           <Badge className={PRIORITY_BADGE[lead.priority]}>{lead.priority} · {lead.fit_score}/10</Badge>
-          <Badge className="text-ui-accent bg-ui-bg border-ui-border">{lead.category || "—"}</Badge>
-          <Badge className="text-blue-400 bg-blue-950 border-blue-800">{(lead.signal_type || "").replace(/_/g, " ")}</Badge>
-          <Badge className="text-ui-accent bg-ui-bg border-ui-border">{lead.country || "—"}</Badge>
+          <CategoryBadges category={lead.category || ""} />
+          <Badge className={SIGNAL_BADGE}>{formatSignalLabel(lead.signal_type || "")}</Badge>
+          <Badge className="text-slate-800 bg-slate-100 border-slate-200">{lead.country || "—"}</Badge>
           {lead.channel && (
             <Badge className={CHANNEL_BADGE[lead.channel] ?? "text-ui-accent bg-ui-bg border-ui-border"}>
               {CHANNEL_LABEL[lead.channel] ?? lead.channel_label ?? lead.channel}
@@ -992,6 +1253,7 @@ function EditConfigPanel({
 
   const [saving, setSaving]   = useState(false);
   const [err, setErr]         = useState("");
+  const schema = context.result_schema ?? { lead_name_field: "company_name", categories: [], geographies: [], signal_types: [] };
   const [form, setForm]       = useState({
     agent_name:            cfg.agent_name ?? "",
     sender_name:           cfg.sender_name ?? "",
@@ -1008,11 +1270,15 @@ function EditConfigPanel({
     hot_min:               thr.hot_min,
     warm_min:              thr.warm_min,
     save_min:              thr.save_min,
+    lead_name_field:       schema.lead_name_field ?? "company_name",
+    categories:            (schema.categories ?? []).join("\n"),
+    geographies:           (schema.geographies ?? []).join("\n"),
+    signal_types:          (schema.signal_types ?? []).join("\n"),
   });
 
   const [queryGroups, setQueryGroups] = useState<QueryGroupDraft[]>(() =>
     (context.search_queries ?? []).length
-      ? context.search_queries.map(g => ({ signal: g.signal, queries: g.queries.join("\n") }))
+      ? context.search_queries.map(g => ({ signal: Array.isArray(g.signal) ? g.signal.join(", ") : g.signal, queries: g.queries.join("\n") }))
       : [{ signal: "general", queries: "" }]
   );
 
@@ -1041,6 +1307,19 @@ function EditConfigPanel({
       }))
       .filter(g => g.queries.length > 0);
 
+    // Build result_schema from form fields — signal_types auto-derived from query groups
+    const formSignalTypes = form.signal_types.split("\n").map(s => s.trim()).filter(Boolean);
+    const querySignalTypes = search_queries.map(g => g.signal);
+    // Merge: keep user-defined signal types, add any new ones from query groups
+    const mergedSignalTypes = [...new Set([...formSignalTypes, ...querySignalTypes])];
+
+    const result_schema = {
+      lead_name_field: form.lead_name_field || "company_name",
+      categories:      form.categories.split("\n").map(s => s.trim()).filter(Boolean),
+      geographies:     form.geographies.split("\n").map(s => s.trim()).filter(Boolean),
+      signal_types:    mergedSignalTypes,
+    };
+
     const payload = {
       agent_name:            form.agent_name || `${form.sender_company} BD Agent`,
       sender_name:           form.sender_name,
@@ -1056,7 +1335,7 @@ function EditConfigPanel({
       search_geo:            form.search_geo,
       max_results_per_query: form.max_results_per_query,
       score_thresholds:      { hot_min: form.hot_min, warm_min: form.warm_min, save_min: form.save_min },
-      result_schema:         context.result_schema,
+      result_schema,
       batch_size:            context.batch_size,
     };
 
@@ -1166,6 +1445,43 @@ function EditConfigPanel({
             </div>
           </section>
 
+          {/* Result schema */}
+          <section>
+            <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-3">Lead classification</p>
+            <p className="text-[11px] text-ui-accent mb-3">These fields define how the AI categorizes leads. Keep them consistent with your targeting above.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-ui-accent mb-1">Lead name field</label>
+                <select value={form.lead_name_field} onChange={e => set("lead_name_field", e.target.value)}
+                  className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-sm text-ui-text">
+                  <option value="company_name">company_name</option>
+                  <option value="brand_name">brand_name</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-ui-accent mb-1">Categories — one per line</label>
+                  <textarea value={form.categories} onChange={e => set("categories", e.target.value)}
+                    rows={4} placeholder={"Manufacturer\nWholesaler\nDistributor"}
+                    className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-[11px] font-mono text-ui-text placeholder:text-ui-accent resize-y" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ui-accent mb-1">Geographies — one per line</label>
+                  <textarea value={form.geographies} onChange={e => set("geographies", e.target.value)}
+                    rows={4} placeholder={"India\nSoutheast Asia\nUSA"}
+                    className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-[11px] font-mono text-ui-text placeholder:text-ui-accent resize-y" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-ui-accent mb-1">Signal types — one per line</label>
+                  <textarea value={form.signal_types} onChange={e => set("signal_types", e.target.value)}
+                    rows={4} placeholder={"operational_trigger\norganizational_trigger"}
+                    className="w-full bg-ui-bg border border-ui-border rounded-lg px-3 py-2 text-[11px] font-mono text-ui-text placeholder:text-ui-accent resize-y" />
+                  <p className="text-[10px] text-ui-accent mt-1">Auto-synced with signal group names below.</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Search queries */}
           <section>
             <div className="flex items-center justify-between mb-3">
@@ -1261,12 +1577,12 @@ function EditConfigPanel({
 // ── Context Inspector ──────────────────────────────────────────────────────────
 
 const CHANNEL_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
-  linkedin:  { label: "LinkedIn",  color: "bg-blue-950 border-blue-700 text-blue-300",   dot: "bg-blue-500" },
-  reddit:    { label: "Reddit",    color: "bg-orange-950 border-orange-700 text-orange-300", dot: "bg-orange-500" },
-  instagram: { label: "Instagram", color: "bg-pink-950 border-pink-700 text-pink-300",   dot: "bg-pink-500" },
-  facebook:  { label: "Facebook",  color: "bg-indigo-950 border-indigo-700 text-indigo-300", dot: "bg-indigo-500" },
-  news:      { label: "News",      color: "bg-purple-950 border-purple-700 text-purple-300", dot: "bg-purple-500" },
-  google:    { label: "Google",    color: "bg-green-950 border-green-700 text-green-300",  dot: "bg-green-500" },
+  linkedin:  { label: "LinkedIn",  color: "bg-sky-100 border-sky-200 text-sky-950",   dot: "bg-sky-500" },
+  reddit:    { label: "Reddit",    color: "bg-orange-100 border-orange-200 text-orange-950", dot: "bg-orange-500" },
+  instagram: { label: "Instagram", color: "bg-pink-100 border-pink-200 text-pink-950",   dot: "bg-pink-500" },
+  facebook:  { label: "Facebook",  color: "bg-indigo-100 border-indigo-200 text-indigo-950", dot: "bg-indigo-500" },
+  news:      { label: "News",      color: "bg-violet-100 border-violet-200 text-violet-950", dot: "bg-violet-500" },
+  google:    { label: "Google",    color: "bg-emerald-100 border-emerald-200 text-emerald-950",  dot: "bg-emerald-500" },
 };
 
 function ScoreBar({ hot, warm, save }: { hot: number; warm: number; save: number }) {
@@ -1302,7 +1618,7 @@ function ScoreBar({ hot, warm, save }: { hot: number; warm: number; save: number
   );
 }
 
-function QueryGroup({ group }: { group: { signal: string; queries: string[] } }) {
+function QueryGroup({ group }: { group: { signal: string | string[]; queries: string[] } }) {
   const [open, setOpen] = useState(true);
   return (
     <div className="border border-ui-border rounded-xl overflow-hidden">
@@ -1311,10 +1627,10 @@ function QueryGroup({ group }: { group: { signal: string; queries: string[] } })
         className="w-full flex items-center justify-between px-4 py-2.5 bg-ui-bg hover:bg-ui-card transition-colors text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-blue-300 uppercase tracking-wider">
-            {group.signal.replace(/_/g, " ")}
+          <span className="text-xs font-semibold text-indigo-800 uppercase tracking-wider">
+            {formatSignalLabel(group.signal)}
           </span>
-          <span className="text-[10px] bg-blue-950 border border-blue-800 text-blue-400 px-1.5 py-0.5 rounded-full">
+          <span className="text-[10px] bg-indigo-50 border border-indigo-200 text-indigo-900 px-1.5 py-0.5 rounded-full font-medium">
             {group.queries.length} queries
           </span>
         </div>
@@ -1380,9 +1696,9 @@ function ContextInspector({ context }: { context: AgentContext }) {
           <p className="text-[11px] uppercase tracking-wider text-ui-accent font-semibold mb-1">Scoring thresholds</p>
           <div className="flex gap-3 mb-3">
             {[
-              { label: "Hot",  score: hot,  cls: "text-orange-400 bg-orange-950 border-orange-800" },
-              { label: "Warm", score: warm, cls: "text-yellow-400 bg-yellow-950 border-yellow-800" },
-              { label: "Save", score: save, cls: "text-gray-400 bg-gray-900 border-gray-700" },
+              { label: "Hot",  score: hot,  cls: PRIORITY_BADGE.hot },
+              { label: "Warm", score: warm, cls: PRIORITY_BADGE.warm },
+              { label: "Save", score: save, cls: "text-slate-700 bg-slate-100 border-slate-200" },
             ].map(({ label, score, cls }) => (
               <div key={label} className={`flex-1 flex flex-col items-center py-2 rounded-lg border ${cls}`}>
                 <span className="text-lg font-bold leading-none">{score}+</span>
@@ -1514,7 +1830,7 @@ function ContextInspector({ context }: { context: AgentContext }) {
             <p className="text-[10px] text-ui-accent mb-1.5">Signal types</p>
             <div className="flex flex-wrap gap-1">
               {context.result_schema.signal_types.map((s, i) => (
-                <span key={i} className="text-[10px] bg-blue-950 border border-blue-800 rounded px-1.5 py-0.5 text-blue-300">{s.replace(/_/g, " ")}</span>
+                <span key={i} className="text-[10px] bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5 text-indigo-950 font-medium">{formatSignalLabel(s)}</span>
               ))}
             </div>
           </div>
@@ -1532,7 +1848,7 @@ function ContextInspector({ context }: { context: AgentContext }) {
       {/* ── Row 6: Starred leads ── */}
       {context.starred_leads.length > 0 && (
         <div>
-          <p className="text-[11px] uppercase tracking-wider text-yellow-400 font-semibold mb-2">
+          <p className="text-[11px] uppercase tracking-wider text-amber-900 font-semibold mb-2">
             Starred leads — {context.starred_leads.length} positive example{context.starred_leads.length !== 1 ? "s" : ""} injected into the AI prompt
           </p>
           <div className="grid grid-cols-2 gap-2">
@@ -1549,8 +1865,8 @@ function ContextInspector({ context }: { context: AgentContext }) {
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-1 mb-1.5">
-                    <Badge className="text-blue-400 bg-blue-950 border-blue-800">{(l.signal_type || "").replace(/_/g, " ")}</Badge>
-                    <Badge className="text-ui-accent bg-ui-bg border-ui-border">{l.country}</Badge>
+                    <Badge className={SIGNAL_BADGE}>{formatSignalLabel(l.signal_type || "")}</Badge>
+                    <Badge className="text-slate-800 bg-slate-100 border-slate-200">{l.country}</Badge>
                   </div>
                   {l.raw_snippet && (
                     <p className="text-[11px] text-ui-accent font-mono line-clamp-2 leading-snug">{l.raw_snippet}</p>
@@ -1578,6 +1894,192 @@ function ContextInspector({ context }: { context: AgentContext }) {
             {context.qualifier_prompt}
             {context.starred_context ? `\n\n${context.starred_context}` : ""}
           </pre>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Refine Queries Panel ───────────────────────────────────────────────────────
+
+interface RefineResult {
+  current:  { signal: string; queries: string[] }[];
+  proposed: { signal: string; queries: string[] }[];
+  dropped:  string[];
+  added:    string[];
+  reasoning: string;
+  reference_count: number;
+}
+
+function RefineQueriesPanel({
+  projectId,
+  onClose,
+  onApplied,
+}: {
+  projectId: string;
+  onClose: () => void;
+  onApplied: () => void;
+}) {
+  const [loading, setLoading]   = useState(true);
+  const [applying, setApplying] = useState(false);
+  const [result, setResult]     = useState<RefineResult | null>(null);
+  const [error, setError]       = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch(`${API}/pollen/${projectId}/refine-queries`, { method: "POST" });
+        if (!r.ok) {
+          const e = await r.json().catch(() => ({}));
+          setError(e.detail ?? "Refinement failed");
+        } else {
+          setResult(await r.json());
+        }
+      } catch (e) {
+        setError(String(e));
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [projectId]);
+
+  const handleApply = async () => {
+    if (!result) return;
+    setApplying(true);
+    try {
+      const r = await fetch(`${API}/pollen/${projectId}/refine-queries/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ proposed: result.proposed, added: result.added }),
+      });
+      if (r.ok) { onApplied(); onClose(); }
+      else {
+        const e = await r.json().catch(() => ({}));
+        setError(e.detail ?? "Apply failed");
+      }
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  // Build a flat set of current query strings for diffing
+  const currentSet = new Set(
+    (result?.current ?? []).flatMap(g => g.queries.map(q => q.trim()))
+  );
+  const proposedSet = new Set(
+    (result?.proposed ?? []).flatMap(g => g.queries.map(q => q.trim()))
+  );
+  const droppedSet = new Set(result?.dropped ?? []);
+  const addedSet   = new Set(result?.added ?? []);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-ui-card border border-ui-border rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-ui-border flex-shrink-0">
+          <div>
+            <h2 className="text-sm font-semibold text-ui-text">Refine search queries</h2>
+            {result && (
+              <p className="text-[11px] text-ui-accent mt-0.5">
+                Based on {result.reference_count} starred / manual lead{result.reference_count !== 1 ? "s" : ""}
+              </p>
+            )}
+          </div>
+          <button onClick={onClose} className="text-ui-accent hover:text-ui-text transition-colors">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+          {loading && (
+            <div className="flex items-center gap-2 text-ui-accent text-sm py-8 justify-center">
+              <RefreshCw className="w-4 h-4 animate-spin" />
+              Analysing your leads and generating refined queries…
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="text-sm text-red-500 bg-red-50 border border-red-200 rounded-lg p-4">{error}</div>
+          )}
+
+          {result && !loading && (
+            <>
+              {/* Reasoning */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-900">
+                <span className="font-semibold">Why these changes: </span>{result.reasoning}
+              </div>
+
+              {/* Stats row */}
+              <div className="flex gap-4 text-xs">
+                <span className="text-green-700 font-medium">+{result.added.length} new queries</span>
+                <span className="text-red-600 font-medium">−{result.dropped.length} removed</span>
+                <span className="text-ui-accent">{result.proposed.flatMap(g => g.queries).length} total after</span>
+              </div>
+
+              {/* Proposed queries grouped by signal, with diff colouring */}
+              <div className="space-y-3">
+                {result.proposed.map(group => (
+                  <div key={group.signal} className="border border-ui-border rounded-lg overflow-hidden">
+                    <div className="px-3 py-2 bg-ui-bg border-b border-ui-border">
+                      <span className="text-[11px] font-semibold text-ui-text uppercase tracking-wide">
+                        {group.signal.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <ul className="divide-y divide-ui-border">
+                      {group.queries.map((q, i) => {
+                        const isNew = addedSet.has(q.trim()) || !currentSet.has(q.trim());
+                        return (
+                          <li key={i} className={`flex items-start gap-2 px-3 py-2 text-xs ${isNew ? "bg-green-50" : "bg-white"}`}>
+                            <span className={`mt-0.5 font-bold flex-shrink-0 ${isNew ? "text-green-600" : "text-ui-accent"}`}>
+                              {isNew ? "+" : " "}
+                            </span>
+                            <span className={isNew ? "text-green-900" : "text-ui-text"}>{q}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+
+              {/* Dropped queries */}
+              {result.dropped.length > 0 && (
+                <div className="border border-red-200 rounded-lg overflow-hidden">
+                  <div className="px-3 py-2 bg-red-50 border-b border-red-200">
+                    <span className="text-[11px] font-semibold text-red-800 uppercase tracking-wide">Removed queries</span>
+                  </div>
+                  <ul className="divide-y divide-red-100">
+                    {result.dropped.map((q, i) => (
+                      <li key={i} className="flex items-start gap-2 px-3 py-2 text-xs bg-red-50">
+                        <span className="mt-0.5 font-bold text-red-500 flex-shrink-0">−</span>
+                        <span className="text-red-800 line-through opacity-70">{q}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {result && !loading && (
+          <div className="flex items-center justify-between px-5 py-4 border-t border-ui-border flex-shrink-0">
+            <p className="text-[11px] text-ui-accent">
+              New queries will run on next agent run. Unchanged queries won't re-run.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={onClose}
+                className="px-3 py-1.5 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text transition-colors">
+                Dismiss
+              </button>
+              <button onClick={handleApply} disabled={applying}
+                className="px-4 py-1.5 rounded-lg bg-ui-text text-white text-xs font-medium hover:opacity-90 disabled:opacity-40 transition-opacity flex items-center gap-1.5">
+                {applying ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                {applying ? "Applying…" : "Apply changes"}
+              </button>
+            </div>
+          </div>
         )}
       </div>
     </div>
@@ -1615,6 +2117,9 @@ function Dashboard({
   const [agentContext, setAgentContext] = useState<AgentContext | null>(null);
   const [search, setSearch]   = useState("");
   const [colFilters, setColFilters] = useState<Record<string, string>>({});
+  const [searchHistoryCount, setSearchHistoryCount] = useState(0);
+  const [addingManual, setAddingManual] = useState(false);
+  const [refining, setRefining]         = useState(false);
 
   const running  = jobStatus?.job === "run"     && jobStatus?.state === "running";
   const cleaning = jobStatus?.job === "cleanup" && jobStatus?.state === "running";
@@ -1647,6 +2152,17 @@ function Dashboard({
     if (r.ok) setJobStatus(await r.json());
   }, [pid]);
 
+  const fetchSearchHistory = useCallback(async () => {
+    const r = await fetch(`${API}/pollen/${pid}/search-history`);
+    if (r.ok) { const d = await r.json(); setSearchHistoryCount(d.total ?? 0); }
+  }, [pid]);
+
+  const clearSearchHistory = async () => {
+    await fetch(`${API}/pollen/${pid}/search-history`, { method: "DELETE" });
+    setSearchHistoryCount(0);
+    showToast("Search history cleared — all queries will run fresh on next agent run");
+  };
+
   // Poll status every 3s.
   // While a job is running: refresh leads+stats every 10s so new leads appear live.
   // On running→done transition: do a final refresh.
@@ -1654,7 +2170,7 @@ function Dashboard({
   const liveRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    fetchStatus(); fetchStats(); fetchLeads();
+    fetchStatus(); fetchStats(); fetchLeads(); fetchSearchHistory();
 
     const statusIv = setInterval(async () => {
       const r = await fetch(`${API}/pollen/${pid}/status`);
@@ -1678,7 +2194,7 @@ function Dashboard({
           clearInterval(liveRefreshRef.current);
           liveRefreshRef.current = null;
         }
-        fetchStats(); fetchLeads();
+        fetchStats(); fetchLeads(); fetchSearchHistory();
       }
 
       prevStateRef.current = s.state;
@@ -1696,7 +2212,23 @@ function Dashboard({
     };
   }, [pid, fetchStatus, fetchStats, fetchLeads]);
 
-  useEffect(() => { if (view === "log") fetchLog(); }, [view, fetchLog]);
+  const logEndRef = useRef<HTMLPreElement | null>(null);
+
+  useEffect(() => {
+    if (view !== "log") return;
+    fetchLog();
+    const iv = setInterval(fetchLog, 3000);
+    return () => clearInterval(iv);
+  }, [view, fetchLog]);
+
+  useEffect(() => {
+    if (view === "log" && logEndRef.current) {
+      const el = logEndRef.current;
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+      if (isNearBottom) el.scrollTop = el.scrollHeight;
+    }
+  }, [log, view]);
+
   useEffect(() => { if (view === "context") fetchContext(); }, [view, fetchContext]);
 
   const handleSave = useCallback(async (id: string, patch: Partial<Lead>) => {
@@ -1710,7 +2242,11 @@ function Dashboard({
       setLeads(prev => prev.map(l => l.id === id ? updated : l));
       if (selected?.id === id) setSelected(updated);
       fetchStats();
-      showToast("Saved");
+      if (patch.starred === true) {
+        showToast("Starred — use \"Refine queries\" to update searches based on this lead");
+      } else {
+        showToast("Saved");
+      }
     }
   }, [pid, selected, fetchStats]);
 
@@ -1756,6 +2292,8 @@ function Dashboard({
     }
   };
 
+  const asLower = (value: unknown) => String(value ?? "").toLowerCase();
+
   const displayed = leads.filter(l => {
     // Sidebar quick-filter
     if (filter.field) {
@@ -1766,12 +2304,12 @@ function Dashboard({
     }
     // Text search
     if (search.trim()) {
-      const q = search.toLowerCase();
-      const name = leadDisplayName(l).toLowerCase();
-      const reason = (l.fit_reason || "").toLowerCase();
-      const country = (l.country || "").toLowerCase();
-      const signal = (l.signal_type || "").toLowerCase();
-      const category = (l.category || "").toLowerCase();
+      const q = asLower(search);
+      const name = asLower(leadDisplayName(l));
+      const reason = asLower(l.fit_reason);
+      const country = asLower(l.country);
+      const signal = asLower(l.signal_type);
+      const category = asLower(l.category);
       if (!name.includes(q) && !reason.includes(q) && !country.includes(q) && !signal.includes(q) && !category.includes(q)) return false;
     }
     // Column-level filters
@@ -1780,8 +2318,8 @@ function Dashboard({
       // brand_name column should match the display name (brand_name or company_name)
       const raw = col === "brand_name"
         ? leadDisplayName(l)
-        : (l[col as keyof Lead] ?? "") as string;
-      if (!raw.toLowerCase().includes(val.toLowerCase())) return false;
+        : l[col as keyof Lead];
+      if (!asLower(raw).includes(asLower(val))) return false;
     }
     return true;
   });
@@ -1868,7 +2406,7 @@ function Dashboard({
 
         {/* Persistent job status banner */}
         {anyRunning && (
-          <div className="px-3 py-2 rounded-lg bg-blue-950 border border-blue-800 text-blue-300 text-[11px] flex items-center gap-2">
+          <div className="px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-950 text-[11px] font-medium flex items-center gap-2">
             <RefreshCw className="w-3 h-3 animate-spin flex-shrink-0" />
             <span className="truncate flex-1">{jobStatus?.detail || (running ? "Searching for leads…" : "Cleaning up duplicates…")}</span>
           </div>
@@ -1876,6 +2414,12 @@ function Dashboard({
         {!anyRunning && jobStatus?.state === "error" && (
           <div className="px-3 py-2 rounded-lg bg-red-950 border border-red-800 text-red-400 text-[11px] truncate" title={jobStatus.detail}>
             ⚠ Last job failed
+          </div>
+        )}
+        {!anyRunning && jobStatus?.state === "exhausted" && (
+          <div className="px-3 py-2 rounded-lg bg-amber-950 border border-amber-700 text-amber-300 text-[11px] flex items-center gap-2">
+            <span className="flex-shrink-0">⚡</span>
+            <span className="truncate flex-1">{jobStatus.detail || "All search queries exhausted — update queries or add new ones to find fresh leads."}</span>
           </div>
         )}
 
@@ -1892,12 +2436,31 @@ function Dashboard({
             Run agent
           </button>
         )}
+        <button onClick={() => setAddingManual(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 transition-colors">
+          <Plus className="w-3.5 h-3.5" />
+          Add company
+        </button>
+        <button onClick={() => setRefining(true)} disabled={anyRunning || (stats.starred ?? 0) === 0}
+          title={(stats.starred ?? 0) === 0 ? "Star some leads first to enable query refinement" : "Refine search queries based on starred and manually-added leads"}
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 disabled:opacity-40 transition-colors">
+          <RefreshCw className="w-3.5 h-3.5" />
+          Refine queries
+        </button>
         <button onClick={triggerCleanup} disabled={anyRunning || stats.total === 0}
           title="AI removes duplicate and archived leads"
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 disabled:opacity-40 transition-colors">
           {cleaning ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
           {cleaning ? "Cleaning…" : "Clean up duplicates"}
         </button>
+        {searchHistoryCount > 0 && (
+          <button onClick={clearSearchHistory} disabled={anyRunning}
+            title={`${searchHistoryCount} queries cached — clear to re-search all queries on next run`}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg border border-yellow-800 text-yellow-400 text-xs font-medium hover:text-yellow-300 hover:border-yellow-600 disabled:opacity-40 transition-colors">
+            <RefreshCw className="w-3.5 h-3.5" />
+            Re-search all ({searchHistoryCount})
+          </button>
+        )}
         <button onClick={() => setCorrecting(true)}
           className="flex items-center gap-2 px-3 py-2 rounded-lg border border-ui-border text-ui-accent text-xs font-medium hover:text-ui-text hover:border-gray-400 transition-colors">
           Leads not accurate?
@@ -1946,28 +2509,26 @@ function Dashboard({
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "All", field: "", value: "" },
-                  { label: "🔥 Hot", field: "priority", value: "hot" },
-                  { label: "Warm", field: "priority", value: "warm" },
-                  { label: "⭐ Starred", field: "starred", value: "true" },
-                  { label: "New", field: "status", value: "new" },
-                  { label: "Reviewed", field: "status", value: "reviewed" },
-                  { label: "Contacted", field: "status", value: "contacted" },
-                ].map(({ label, field, value }) => (
+                {([
+                  { label: "All", field: "", value: "", idle: "border-ui-border bg-white text-ui-text shadow-sm", active: "bg-ui-text text-white border-ui-text shadow-sm" },
+                  { label: "🔥 Hot", field: "priority", value: "hot", idle: "border-orange-200 bg-orange-50 text-orange-950", active: "bg-orange-600 text-white border-orange-600" },
+                  { label: "Warm", field: "priority", value: "warm", idle: "border-amber-200 bg-amber-50 text-amber-950", active: "bg-amber-500 text-white border-amber-500" },
+                  { label: "⭐ Starred", field: "starred", value: "true", idle: "border-yellow-300 bg-yellow-50 text-yellow-950", active: "bg-yellow-500 text-white border-yellow-500" },
+                  { label: "New", field: "status", value: "new", idle: "border-blue-200 bg-blue-50 text-blue-950", active: "bg-blue-700 text-white border-blue-700" },
+                  { label: "Reviewed", field: "status", value: "reviewed", idle: "border-amber-200 bg-amber-50 text-amber-950", active: "bg-amber-600 text-white border-amber-600" },
+                  { label: "Contacted", field: "status", value: "contacted", idle: "border-emerald-200 bg-emerald-50 text-emerald-950", active: "bg-emerald-700 text-white border-emerald-700" },
+                ] as const).map(({ label, field, value, idle, active }) => (
                   <button key={label} onClick={() => setFilter({ field, value })}
-                    className={`px-3 py-1 rounded-full text-xs border transition-colors ${
-                      filter.field === field && filter.value === value
-                        ? "bg-ui-text text-white border-ui-text"
-                        : "border-ui-border text-ui-accent hover:text-ui-text hover:border-gray-400"
-                    }`}>
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                      filter.field === field && filter.value === value ? active : idle
+                    } hover:opacity-95`}>
                     {label}
                   </button>
                 ))}
                 {/* Active col-filter chips */}
                 {Object.entries(colFilters).filter(([,v]) => v).map(([col, val]) => (
                   <button key={col} onClick={() => setColFilters(prev => ({ ...prev, [col]: "" }))}
-                    className="flex items-center gap-1 px-3 py-1 rounded-full text-xs border border-blue-700 bg-blue-950 text-blue-300">
+                    className="flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium border border-blue-200 bg-blue-50 text-blue-950">
                     {col}: {val} <X className="w-3 h-3" />
                   </button>
                 ))}
@@ -2026,16 +2587,16 @@ function Dashboard({
                         </td>
                         <td className="px-3 py-2.5 text-ui-accent whitespace-nowrap text-xs">{lead.country || "—"}</td>
                         <td className="px-3 py-2.5 text-ui-accent whitespace-nowrap text-xs">{fmtDate(lead.found_at)}</td>
-                        <td className="px-3 py-2.5"><Badge className={PRIORITY_BADGE[lead.priority]}>{lead.priority}</Badge></td>
-                        <td className="px-3 py-2.5"><Badge className="text-ui-accent bg-ui-bg border-ui-border">{lead.category || "—"}</Badge></td>
-                        <td className="px-3 py-2.5"><Badge className="text-blue-400 bg-blue-950 border-blue-800">{(lead.signal_type || "").replace(/_/g, " ")}</Badge></td>
+                        <td className="px-3 py-2.5"><Badge className={`${PRIORITY_BADGE[lead.priority]} capitalize`}>{lead.priority}</Badge></td>
+                        <td className="px-3 py-2.5 align-top"><CategoryBadges category={lead.category || ""} /></td>
+                        <td className="px-3 py-2.5"><Badge className={SIGNAL_BADGE}>{formatSignalLabel(lead.signal_type || "")}</Badge></td>
                         <td className="px-3 py-2.5">
                           {lead.channel
-                            ? <Badge className={CHANNEL_BADGE[lead.channel] ?? "text-ui-accent bg-ui-bg border-ui-border"}>{CHANNEL_LABEL[lead.channel] ?? lead.channel_label ?? lead.channel}</Badge>
+                            ? <Badge className={CHANNEL_BADGE[lead.channel] ?? "text-slate-800 bg-slate-100 border-slate-200"}>{CHANNEL_LABEL[lead.channel] ?? lead.channel_label ?? lead.channel}</Badge>
                             : <span className="text-ui-accent text-xs">—</span>
                           }
                         </td>
-                        <td className="px-3 py-2.5"><Badge className="text-ui-accent bg-ui-bg border-ui-border">{lead.status}</Badge></td>
+                        <td className="px-3 py-2.5"><Badge className={`${STATUS_BADGE[lead.status] ?? "text-slate-700 bg-slate-100 border-slate-200"} capitalize`}>{lead.status}</Badge></td>
                         <td className="px-3 py-2.5">
                           <div className="flex items-center gap-1">
                             <button onClick={e => { e.stopPropagation(); setSelected(lead); }}
@@ -2043,7 +2604,7 @@ function Dashboard({
                               View
                             </button>
                             <button onClick={e => { e.stopPropagation(); handleSave(lead.id, { status: "contacted" }); }}
-                              className="px-2 py-1 rounded-md bg-green-900 text-green-400 text-[10px] font-medium hover:opacity-90 transition-opacity">
+                              className="px-2 py-1 rounded-md bg-emerald-600 text-white text-[10px] font-semibold hover:bg-emerald-700 transition-colors">
                               Contacted
                             </button>
                             {lead.source_url && (
@@ -2077,7 +2638,7 @@ function Dashboard({
                 <RefreshCw className="w-3.5 h-3.5" /> Refresh
               </button>
             </div>
-            <pre className="bg-ui-card border border-ui-border rounded-xl p-4 text-xs font-mono leading-relaxed text-ui-accent whitespace-pre-wrap max-h-[600px] overflow-y-auto">
+            <pre ref={logEndRef} className="bg-ui-card border border-ui-border rounded-xl p-4 text-xs font-mono leading-relaxed text-ui-accent whitespace-pre-wrap max-h-[600px] overflow-y-auto">
               {log || "No log yet."}
             </pre>
           </div>
@@ -2105,6 +2666,32 @@ function Dashboard({
       </main>
 
       {selected && <DetailPanel lead={selected} onClose={() => setSelected(null)} onSave={handleSave} onDelete={handleDelete} />}
+
+      {addingManual && (
+        <AddCompanyModal
+          projectId={pid}
+          onClose={() => { setAddingManual(false); fetchLeads(); fetchStats(); }}
+          onAdded={(lead) => {
+            setLeads(prev => {
+              const exists = prev.find(l => l.id === lead.id);
+              return exists ? prev.map(l => l.id === lead.id ? lead : l) : [lead, ...prev];
+            });
+            fetchStats();
+            showToast(`Added: ${lead.brand_name ?? lead.company_name ?? "Company"} — star good leads and use "Refine queries" to update your search`);
+          }}
+        />
+      )}
+
+      {refining && (
+        <RefineQueriesPanel
+          projectId={pid}
+          onClose={() => setRefining(false)}
+          onApplied={() => {
+            fetchContext();
+            showToast("Queries updated — run the agent to search with the new queries");
+          }}
+        />
+      )}
 
       {correcting && (
         <CorrectLeadsChat
@@ -2197,6 +2784,20 @@ export default function PollenBDTool() {
     } catch { /* ignore */ }
   };
 
+  const handleRenameProject = async (pid: string, name: string) => {
+    try {
+      const r = await fetch(`${API}/pollen/projects/${pid}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (r.ok) {
+        const updated: Project = await r.json();
+        setProjects(prev => prev.map(p => p.id === pid ? updated : p));
+      }
+    } catch { /* ignore */ }
+  };
+
   const handleSwitchProject = () => {
     setActiveProject(null);
     setConfig(null);
@@ -2220,6 +2821,7 @@ export default function PollenBDTool() {
         onSelect={handleSelectProject}
         onRefresh={loadProjects}
         onDelete={handleDeleteProject}
+        onRename={handleRenameProject}
       />
     );
   }

@@ -45,13 +45,21 @@
   .stat-card.hot .value { color: var(--hot); }
   .stat-card.new .value { color: var(--blue); }
 
-  /* Filters */
+  /* Filters — idle states tinted to match priority/status (readable on dark UI) */
   .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
-  .filter-btn { padding: 6px 14px; border: 1px solid var(--border); border-radius: 99px; background: none; color: var(--muted); cursor: pointer; font-size: 13px; transition: all 0.15s; }
-  .filter-btn:hover { border-color: var(--text); color: var(--text); }
+  .filter-btn { padding: 7px 14px; border: 1px solid var(--border); border-radius: 99px; background: rgba(255,255,255,0.03); color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.15s; }
+  .filter-btn:hover { border-color: rgba(255,255,255,0.35); color: var(--text); }
   .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
-  .filter-hot.active { background: var(--hot); border-color: var(--hot); }
-  .filter-warm.active { background: var(--warm); border-color: var(--warm); color: #000; }
+  .filter-hot:not(.active) { border-color: rgba(249, 115, 22, 0.45); color: #ffedd5; background: rgba(249, 115, 22, 0.12); }
+  .filter-warm:not(.active) { border-color: rgba(250, 204, 21, 0.4); color: #fef9c3; background: rgba(250, 204, 21, 0.08); }
+  .filter-hot.active { background: var(--hot); border-color: var(--hot); color: #fff; }
+  .filter-warm.active { background: #eab308; border-color: #eab308; color: #1a1a1a; }
+  .filter-new:not(.active) { border-color: rgba(59, 130, 246, 0.45); color: #bfdbfe; background: rgba(59, 130, 246, 0.1); }
+  .filter-reviewed:not(.active) { border-color: rgba(250, 204, 21, 0.35); color: #fef08a; background: rgba(250, 204, 21, 0.06); }
+  .filter-contacted:not(.active) { border-color: rgba(34, 197, 94, 0.45); color: #bbf7d0; background: rgba(34, 197, 94, 0.1); }
+  .filter-new.active { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .filter-reviewed.active { background: #ca8a04; border-color: #ca8a04; color: #fff; }
+  .filter-contacted.active { background: #15803d; border-color: #15803d; color: #fff; }
 
   /* Leads table */
   .leads-table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
@@ -64,22 +72,27 @@
   .leads-table .brand-cell { font-weight: 600; font-size: 14px; }
   .leads-table .reason-cell { color: var(--muted); font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-  .badge { font-size: 11px; padding: 2px 8px; border-radius: 99px; font-weight: 500; display: inline-block; }
-  .badge-hot { background: #2d1a0e; color: var(--hot); }
-  .badge-warm { background: #2d2a0e; color: var(--warm); }
-  .badge-cold { background: #1e2030; color: var(--cold); }
-  .badge-category { background: var(--surface2); color: var(--muted); }
-  .badge-signal { background: #1a2240; color: var(--blue); }
+  .badge { font-size: 12px; padding: 4px 10px; border-radius: 99px; font-weight: 600; display: inline-block; border: 1px solid transparent; line-height: 1.35; }
+  .badge-hot { background: rgba(249, 115, 22, 0.2); color: #ffedd5; border-color: rgba(249, 115, 22, 0.45); }
+  .badge-warm { background: rgba(250, 204, 21, 0.15); color: #fef9c3; border-color: rgba(250, 204, 21, 0.4); }
+  .badge-cold { background: rgba(107, 114, 128, 0.2); color: #e5e7eb; border-color: rgba(156, 163, 175, 0.35); }
+  .badge-category { background: var(--surface2); color: var(--text); border-color: var(--border); max-width: 280px; white-space: normal; }
+  .badge-signal { background: rgba(59, 130, 246, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.4); }
+  .badge-status-new { background: rgba(59, 130, 246, 0.18); color: #bfdbfe; border-color: rgba(59, 130, 246, 0.4); }
+  .badge-status-reviewed { background: rgba(250, 204, 21, 0.15); color: #fef9c3; border-color: rgba(250, 204, 21, 0.35); }
+  .badge-status-contacted { background: rgba(34, 197, 94, 0.18); color: #bbf7d0; border-color: rgba(34, 197, 94, 0.4); }
+  .badge-status-archived { background: rgba(107, 114, 128, 0.2); color: #d1d5db; border-color: rgba(156, 163, 175, 0.35); }
   .lead-badges { display: flex; gap: 6px; flex-wrap: wrap; }
-  .score-ring { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
-  .score-hot { background: #2d1a0e; color: var(--hot); }
-  .score-warm { background: #2d2a0e; color: var(--warm); }
-  .score-cold { background: #1e2030; color: var(--cold); }
-  .btn { padding: 5px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 11px; font-weight: 500; transition: opacity 0.15s; white-space: nowrap; }
+  .category-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: 280px; }
+  .score-ring { width: 34px; height: 34px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; border: 1px solid transparent; }
+  .score-hot { background: rgba(249, 115, 22, 0.2); color: #ffedd5; border-color: rgba(249, 115, 22, 0.45); }
+  .score-warm { background: rgba(250, 204, 21, 0.15); color: #fef9c3; border-color: rgba(250, 204, 21, 0.4); }
+  .score-cold { background: rgba(107, 114, 128, 0.2); color: #e5e7eb; border-color: rgba(156, 163, 175, 0.35); }
+  .btn { padding: 6px 12px; border-radius: 8px; border: none; cursor: pointer; font-size: 11px; font-weight: 600; transition: opacity 0.15s; white-space: nowrap; }
   .btn:hover { opacity: 0.85; }
   .btn-primary { background: var(--blue); color: #fff; }
   .btn-ghost { background: var(--surface2); color: var(--text); }
-  .btn-success { background: #14532d; color: var(--green); }
+  .btn-success { background: #15803d; color: #fff; }
   .actions-cell { display: flex; gap: 6px; }
 
   /* Detail panel */
@@ -139,9 +152,9 @@
         <button class="filter-btn active" onclick="applyFilter('','')" id="f-all">All</button>
         <button class="filter-btn filter-hot" onclick="applyFilter('priority','hot')" id="f-hot">🔥 Hot</button>
         <button class="filter-btn filter-warm" onclick="applyFilter('priority','warm')" id="f-warm">☀️ Warm</button>
-        <button class="filter-btn" onclick="applyFilter('status','new')" id="f-new">New only</button>
-        <button class="filter-btn" onclick="applyFilter('status','reviewed')" id="f-reviewed">Reviewed</button>
-        <button class="filter-btn" onclick="applyFilter('status','contacted')" id="f-contacted">Contacted</button>
+        <button class="filter-btn filter-new" onclick="applyFilter('status','new')" id="f-new">New only</button>
+        <button class="filter-btn filter-reviewed" onclick="applyFilter('status','reviewed')" id="f-reviewed">Reviewed</button>
+        <button class="filter-btn filter-contacted" onclick="applyFilter('status','contacted')" id="f-contacted">Contacted</button>
       </div>
       <div id="leads-grid"></div>
     </div>
@@ -194,6 +207,28 @@ let allLeads = [];
 let currentFilter = { field: '', value: '' };
 let currentLead = null;
 let saveTimer = null;
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+function statusBadgeClass(status) {
+  const s = (status || 'new').toLowerCase();
+  if (s === 'reviewed') return 'badge-status-reviewed';
+  if (s === 'contacted') return 'badge-status-contacted';
+  if (s === 'archived') return 'badge-status-archived';
+  return 'badge-status-new';
+}
+function formatSignal(s) {
+  if (!s) return '—';
+  return s.replace(/_/g, ' ').replace(/^string:\s*/i, '').trim();
+}
+function formatCategoryBadges(cat) {
+  if (!cat || !String(cat).trim()) return '<span class="badge badge-category">—</span>';
+  const raw = String(cat).trim();
+  const parts = raw.split('|').map(p => p.trim()).filter(Boolean);
+  if (parts.length <= 1) return `<span class="badge badge-category">${escHtml(raw)}</span>`;
+  return '<span class="category-stack">' + parts.map(p => `<span class="badge badge-category">${escHtml(p)}</span>`).join('') + '</span>';
+}
 
 // ── Views ─────────────────────────────────────────────────────────────────────
 function setView(view) {
@@ -274,9 +309,9 @@ function renderLeads() {
               <td>${l.country || '—'}</td>
               <td style="white-space:nowrap">${fmtDate(l.found_at)}</td>
               <td><span class="badge badge-${l.priority}">${l.priority}</span></td>
-              <td><span class="badge badge-category">${l.category || '—'}</span></td>
-              <td><span class="badge badge-signal">${(l.signal_type||'').replace('_',' ')}</span></td>
-              <td><span class="badge badge-category">${l.status || 'new'}</span></td>
+              <td>${formatCategoryBadges(l.category)}</td>
+              <td><span class="badge badge-signal">${formatSignal(l.signal_type || '')}</span></td>
+              <td><span class="badge ${statusBadgeClass(l.status)}">${l.status || 'new'}</span></td>
               <td class="reason-cell" title="${(l.fit_reason||'').replace(/"/g,'&quot;')}">${l.fit_reason || '—'}</td>
               <td>
                 <div class="actions-cell">
@@ -309,8 +344,8 @@ function openLead(id) {
 
   document.getElementById('dp-badges').innerHTML = `
     <span class="badge badge-${l.priority}">${l.priority} · ${l.fit_score}/10</span>
-    <span class="badge badge-category">${l.category || '—'}</span>
-    <span class="badge badge-signal">${(l.signal_type||'').replace('_',' ')}</span>
+    ${formatCategoryBadges(l.category)}
+    <span class="badge badge-signal">${formatSignal(l.signal_type || '')}</span>
     <span class="badge badge-category">${l.country || '—'}</span>
   `;
 
