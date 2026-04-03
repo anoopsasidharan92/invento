@@ -18,5 +18,6 @@ backend/context_memory.json
 pollen-bd-agent/config.json
 pollen-bd-agent/data/
 pollen-bd-agent/.env
+real-estate-agent/.env
 
 *.log
