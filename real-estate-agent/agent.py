@@ -7,11 +7,17 @@ Defaults to the current working directory if --project-dir is omitted.
 import argparse
 import os
 import json
+import sys
 import time
 import datetime
 import hashlib
 import requests
 from pathlib import Path
+
+_REPO_ROOT = Path(__file__).resolve().parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from agent_postgres import sync_re_listing  # noqa: E402
 
 from search import search_listings
 from config_loader import load_config
@@ -28,7 +34,7 @@ PROJECT_DIR = Path(args.project_dir) if args.project_dir else Path.cwd()
 
 cfg = load_config(project_dir=str(PROJECT_DIR))
 
-OLLAMA_URL   = "http://localhost:11434/api/chat"
+OLLAMA_URL   = f"http://{os.environ.get('OLLAMA_HOST', 'localhost')}:11434/api/chat"
 OLLAMA_MODEL = "llama3.2"
 DATA_FILE    = str(PROJECT_DIR / "data" / "listings.json")
 LOG_FILE     = str(PROJECT_DIR / "data" / "agent.log")
@@ -512,6 +518,7 @@ def run():
             run_stats["cold_skipped"] += 1
 
         save_listings(listings)
+        sync_re_listing(PROJECT_DIR, lid, evaluated)
 
         if batch_size and new_count >= batch_size:
             log(f"  Batch of {batch_size} new listings found. Stopping this run.")

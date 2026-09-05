@@ -1,0 +1,74 @@
+{
+  "_comment": "Sales Deal Agent — finds strong retail/commerce offers for a target product or category.",
+
+  "agent_name": "Sales Deal Agent",
+  "sender_name": "Sales",
+  "sender_company": "Your Team",
+  "sender_description": "Commercial team tracking the best available offers",
+
+  "qualifier_context": "You evaluate web snippets to find genuine, in-stock or time-limited deals (price drops, bundles, clearance) worth tracking for our buyers.",
+
+  "ideal_customer_profile": "Field sales and account teams who need verified availability and fair pricing in India e-commerce and modern trade.",
+  "what_we_offer": "A ranked feed of deal signals with source links so reps can act quickly.",
+  "product_focus": "Example: wireless earbuds under ₹2,500 from major brands (replace with your SKU or category).",
+
+  "strong_signals": [
+    "Explicit discount %, slash pricing, or \"under ₹X\" in title/snippet",
+    "In-stock, same-day or next-day delivery mentioned",
+    "Official brand store, authorised reseller, or trusted retail chain (not only generic marketplaces)",
+    "Bundle or BOGO that improves net unit cost",
+    "Limited-time sale window (festive sale, flash sale) with clear end date"
+  ],
+
+  "weak_signals": [
+    "Vague \"great deals\" with no price",
+    "Used/refurbished only when we want new SKU",
+    "Wrong geography or import-only listings",
+    "Affiliate spam / coupon farms with no merchant credibility"
+  ],
+
+  "result_schema": {
+    "lead_name_field": "product_name",
+    "categories": ["electronics", "grocery", "personal_care", "home", "fashion", "other"],
+    "geographies": ["India", "Indonesia", "Singapore", "other"],
+    "signal_types": ["price_drop", "clearance", "bundle_offer", "marketplace_promo"]
+  },
+
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+
+  "search_queries": [
+    {
+      "signal": "price_drop",
+      "queries": [
+        "wireless earbuds lowest price India 2024 official brand store news",
+        "electronics flash sale India today press release distributor",
+        "consumer electronics clearance India authorised reseller"
+      ]
+    },
+    {
+      "signal": "clearance",
+      "queries": [
+        "end of season sale electronics India retail chain",
+        "warehouse clearance consumer goods India trade news",
+        "FMCG bundle offer modern trade India 2024"
+      ]
+    },
+    {
+      "signal": "marketplace_promo",
+      "queries": [
+        "festive sale electronics India 2024 brand official announcement",
+        "online sale personal care India beauty retailer official",
+        "consumer durables discount India Croma Reliance Digital offer"
+      ]
+    }
+  ],
+
+  "search_channels": ["google", "news", "reddit"],
+  "max_results_per_query": 5,
+  "search_geo": "in",
+  "exclude_marketplace_serp": true
+}

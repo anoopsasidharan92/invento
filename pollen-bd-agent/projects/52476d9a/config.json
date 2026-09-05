@@ -17,16 +17,17 @@
     {
       "signal": "buyer_sourcing_discounted_stock",
       "queries": [
-        "FMCG liquidation singapore",
-        "beauty clearance indonesia",
-        "FMCG distributor malaysia"
+        "FMCG liquidation Southeast Asia",
+        "beauty clearance distributors Indonesia",
+        "discounted FMCG stock Malaysia"
       ]
     },
     {
       "signal": "buyer_expanding_into_new_geographies",
       "queries": [
-        "FMCG distributor philippines",
-        "beauty import india"
+        "FMCG distributor expansion India",
+        "beauty wholesale Philippines",
+        " FMCG sole distributor Singapore"
       ]
     }
   ],

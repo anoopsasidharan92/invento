@@ -1,0 +1,59 @@
+{
+  "agent_name": "Anoop Pollen's Sales Deals",
+  "sender_name": "Anoop Pollen",
+  "sender_company": "Sales Team, XYZ Retail",
+  "sender_description": "Retail Deal Specialist | Finding amazing deals for customers.",
+  "qualifier_context": "For great discounts on Dove Shampoo: look for bundle deals and clearance sales. Ignore prices outside of \u20b920000 - \u20b930000. For B2B procurement or bulk orders, please contact our B2B team.",
+  "ideal_customer_profile": "India, online shoppers looking for discounts on personal care products",
+  "what_we_offer": "Exclusive deals on Dove Shampoo, straight to Anoop's inbox.",
+  "product_focus": "Dove shampoo (carton) under \u20b920000 in India",
+  "strong_signals": [
+    "Concrete deal signal \u2014 e.g. explicit discount %, flash sale, lowest price, in stock"
+  ],
+  "weak_signals": [
+    "Price drop below \u20b920 off retail, likely error or fake ad"
+  ],
+  "result_schema": {
+    "lead_name_field": "product_name",
+    "categories": [
+      "Shampoo",
+      "Personal Care"
+    ],
+    "geographies": [
+      "India"
+    ],
+    "signal_types": [
+      "snake_case_signal_name"
+    ]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "price_drop_dove_shampoo",
+      "queries": [
+        "dove shampoo lowest price",
+        "dove carton sale",
+        "dove shampoo \u20b920000"
+      ]
+    },
+    {
+      "signal": "clearance_dove_shampoo",
+      "queries": [
+        "clearance dove shampoo",
+        "dove shampoo discount",
+        "buy one get one free dove"
+      ]
+    }
+  ],
+  "search_channels": [
+    "google",
+    "news"
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "in",
+  "batch_size": 50
+}

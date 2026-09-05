@@ -1,3 +1,6 @@
+# Repo-root secrets (e.g. POSTGRES_URL from postgres.env.example)
+/.env
+
 venv/
 .venv/
 __pycache__/
@@ -10,7 +13,10 @@ frontend/dist/
 backend/uploads/
 backend/outputs/
 backend/inventory.db
+backend/*.db.bak*
 backend/*.log
+uploads/
+outputs/
 backend/.venv/
 backend/context_memory.json
 
@@ -19,5 +25,6 @@ pollen-bd-agent/config.json
 pollen-bd-agent/data/
 pollen-bd-agent/.env
 real-estate-agent/.env
+sales-deal-agent/.env
 
 *.log

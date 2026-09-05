@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: agents
+      POSTGRES_PASSWORD: agents_local_dev_only
+      POSTGRES_DB: agents
+    ports:
+      - "5432:5432"
+    volumes:
+      - agents_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agents -d agents"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///inventory.db
+      - OLLAMA_HOST=host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./backend:/app
+      - ./backend/inventory.db:/app/inventory.db
+      - ./uploads:/app/uploads
+      - ./outputs:/app/outputs
+      - ./pollen-bd-agent:/pollen-bd-agent
+      - ./real-estate-agent:/real-estate-agent
+      - ./sales-deal-agent:/sales-deal-agent
+      - ./agent_postgres.py:/agent_postgres.py
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  agents_pgdata:

@@ -25,6 +25,11 @@ from agent import CATEGORY_TAXONOMY
 import parser as inv_parser
 from database import get_db, init_db, save_inventory
 from schemas import UploadResponse, SheetInfo
+from sales_deal_routes import router as sales_deal_router
+
+# ─── Ollama config ────────────────────────────────────────────────────────
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "localhost")
+OLLAMA_URL   = f"http://{OLLAMA_HOST}:11434/api/chat"
 
 # ─── Pollen BD Agent paths ─────────────────────────────────────────────────────
 POLLEN_DIR           = Path(__file__).parent.parent / "pollen-bd-agent"
@@ -149,6 +154,7 @@ OUTPUT_DIR.mkdir(exist_ok=True)
 CONTEXT_MEMORY_PATH = Path("context_memory.json")
 
 app = FastAPI(title="Inventory Parser API", version="1.0.0")
+app.include_router(sales_deal_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -495,7 +501,6 @@ Note: This company ({company_name}) was manually submitted by the user as a pote
 """
 
     # ── Call Ollama ───────────────────────────────────────────────────────────
-    OLLAMA_URL   = "http://localhost:11434/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     def call_ollama():
@@ -738,7 +743,7 @@ def pollen_run(pid: str):
         raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
     project_dir = str(_pollen_project_dir(pid))
     agent_script = str(POLLEN_DIR / "agent.py")
-    venv_python = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    venv_python = sys.executable
     env = os.environ.copy()
     pollen_env = POLLEN_DIR / ".env"
     if pollen_env.exists():
@@ -821,7 +826,7 @@ def pollen_cleanup(pid: str):
         raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
     project_dir   = str(_pollen_project_dir(pid))
     cleanup_script = str(POLLEN_DIR / "cleanup.py")
-    venv_python   = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    venv_python   = sys.executable
     env = os.environ.copy()
     pollen_env = POLLEN_DIR / ".env"
     if pollen_env.exists():
@@ -956,7 +961,7 @@ Output ONLY this JSON (no markdown, no explanation):
   "reasoning": "2-3 sentence summary of what changed and why, based on the reference leads"
 }}"""
 
-    OLLAMA_URL   = "http://localhost:11434/api/chat"
+    # ── Call Ollama ───────────────────────────────────────────────────────────
     OLLAMA_MODEL = "llama3.2"
 
     def call_ollama():
@@ -1094,7 +1099,6 @@ async def pollen_onboard(ws: WebSocket, project_id: str = ""):
 
     cfg_path, _, _ = _pollen_project_paths(project_id)
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     def ollama_chat(messages: list, system: str) -> str:
@@ -1309,7 +1313,7 @@ async def pollen_correct(ws: WebSocket, project_id: str = ""):
 
     cfg_path, data_path, _ = _pollen_project_paths(project_id)
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_URL = "http://OLLAMA_URL/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     def ollama_chat(messages: list, system: str) -> str:
@@ -1747,7 +1751,7 @@ async def re_listing_from_url(pid: str, payload: dict):
         with open(cfg_path) as f:
             project_cfg = json.load(f)
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_URL = "http://OLLAMA_URL/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     _browser_headers = {
@@ -1938,7 +1942,7 @@ async def _re_evaluate_listing(listing: dict, cfg: dict) -> dict:
     import requests as _requests
     import asyncio
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_URL = "http://OLLAMA_URL/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     schema = cfg.get("result_schema", {})
@@ -2123,7 +2127,7 @@ def re_run(pid: str):
         raise HTTPException(409, f"A {current.get('job', 'job')} is already running")
     project_dir = str(_re_project_dir(pid))
     agent_script = str(RE_DIR / "agent.py")
-    venv_python = str(Path(__file__).parent.parent / "venv" / "bin" / "python3")
+    venv_python = sys.executable
     env = os.environ.copy()
     re_env = RE_DIR / ".env"
     if re_env.exists():
@@ -2260,7 +2264,7 @@ async def re_onboard(ws: WebSocket, project_id: str = ""):
 
     cfg_path, _, _ = _re_project_paths(project_id)
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_URL = "http://OLLAMA_URL/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     def ollama_chat(messages: list, system: str) -> str:
@@ -2478,7 +2482,7 @@ async def re_refine(ws: WebSocket, project_id: str = ""):
 
     cfg_path, data_path, _ = _re_project_paths(project_id)
 
-    OLLAMA_URL = "http://localhost:11434/api/chat"
+    OLLAMA_URL = "http://OLLAMA_URL/api/chat"
     OLLAMA_MODEL = "llama3.2"
 
     def ollama_chat(messages: list, system: str) -> str:

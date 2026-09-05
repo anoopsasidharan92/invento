@@ -2,6 +2,7 @@ import { ComponentType } from "react";
 import InventoryTool from "./InventoryTool";
 import PollenBDTool from "./PollenBDTool";
 import RealEstateTool from "./RealEstateTool";
+import SalesDealTool from "./SalesDealTool";
 
 export interface ToolDefinition {
   id: string;
@@ -42,6 +43,15 @@ const tools: ToolDefinition[] = [
     color: "bg-blue-900",
     status: "live",
     component: RealEstateTool,
+  },
+  {
+    id: "sales-deals",
+    name: "Sales Deal Agent",
+    description: "Find and rank the best product deals from the web — prices, promos, availability — and track them in one place.",
+    icon: "🏷️",
+    color: "bg-violet-900",
+    status: "live",
+    component: SalesDealTool,
   },
   // ── Add new tools below ────────────────────────────────────────────────────
 ];
