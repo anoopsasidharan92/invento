@@ -6,8 +6,7 @@ import {
   Link, Loader2, CheckCircle2,
 } from "lucide-react";
 
-const API    = "http://localhost:8000";
-const WS_API = "ws://localhost:8000";
+import { API_BASE as API, WS_BASE as WS_API } from "../config";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

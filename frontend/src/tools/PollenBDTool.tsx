@@ -4,8 +4,7 @@ import {
   Star, Trash2, Plus, FolderOpen, ArrowLeft, Square, Download, Pencil,
 } from "lucide-react";
 
-const API    = "http://localhost:8000";
-const WS_API = "ws://localhost:8000";
+import { API_BASE as API, WS_BASE as WS_API } from "../config";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1966,10 +1965,6 @@ function RefineQueriesPanel({
   const currentSet = new Set(
     (result?.current ?? []).flatMap(g => g.queries.map(q => q.trim()))
   );
-  const proposedSet = new Set(
-    (result?.proposed ?? []).flatMap(g => g.queries.map(q => q.trim()))
-  );
-  const droppedSet = new Set(result?.dropped ?? []);
   const addedSet   = new Set(result?.added ?? []);
 
   return (

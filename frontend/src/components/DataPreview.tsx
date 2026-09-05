@@ -74,7 +74,7 @@ export default function DataPreview({ preview, onCellEdit, onDeleteRow }: Props)
 
       // Optimistic local update
       setLocalRows((prev) => {
-        const next = applyAll
+        const next: Record<string, string>[] = applyAll
           ? prev.map((r) => ({ ...r, "Units Per Carton": trimmed }))
           : prev.map((r, i) => i === absoluteIdx ? { ...r, "Units Per Carton": trimmed } : r);
         // Also update Quantity in units locally

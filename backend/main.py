@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import aiofiles
+from dotenv import load_dotenv
 import pandas as pd
 from fastapi import (
     FastAPI, File, HTTPException, UploadFile, WebSocket,
@@ -153,12 +154,34 @@ OUTPUT_DIR = Path("outputs")
 OUTPUT_DIR.mkdir(exist_ok=True)
 CONTEXT_MEMORY_PATH = Path("context_memory.json")
 
+# Load backend/.env (ALLOWED_ORIGINS, API keys) before reading any env vars.
+load_dotenv(Path(__file__).parent / ".env")
+
 app = FastAPI(title="Inventory Parser API", version="1.0.0")
 app.include_router(sales_deal_router)
 
+# Origins allowed to call this API. Local dev ports are always permitted; add
+# deployed frontends (e.g. the Vercel domain) via the ALLOWED_ORIGINS env var
+# as a comma-separated list. Kept to an explicit allowlist rather than "*"
+# because this backend spawns subprocesses and reads local files.
+_DEFAULT_ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:5174",
+    "http://localhost:3000",
+]
+_extra_origins = [
+    o.strip().rstrip("/")
+    for o in os.getenv("ALLOWED_ORIGINS", "").split(",")
+    if o.strip()
+]
+ALLOWED_ORIGINS = _DEFAULT_ORIGINS + _extra_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:5174", "http://localhost:3000"],
+    allow_origins=ALLOWED_ORIGINS,
+    # Vercel preview deployments get a new subdomain per build; this matches them
+    # without having to add each one by hand.
+    allow_origin_regex=os.getenv("ALLOWED_ORIGIN_REGEX") or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

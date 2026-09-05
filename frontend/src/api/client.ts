@@ -1,5 +1,4 @@
-const API_BASE = "http://localhost:8000";
-const WS_BASE = "ws://localhost:8000";
+import { API_BASE, WS_BASE } from "../config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

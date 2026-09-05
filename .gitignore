@@ -1,5 +1,9 @@
-# Repo-root secrets (e.g. POSTGRES_URL from postgres.env.example)
+# Secrets — never commit. .env.example templates are tracked instead.
 /.env
+.env
+.env.local
+.env.*.local
+!.env.example
 
 venv/
 .venv/

@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useState } from "react";
-import { Upload, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Upload, Loader2 } from "lucide-react";
 import { uploadFile, UploadResponse } from "../api/client";
 
 interface Props {
