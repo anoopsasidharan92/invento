@@ -1,0 +1,97 @@
+{
+  "agent_name": "India-Plywood-Sourcing-Agent",
+  "sender_name": "Rahul Jain, Wholesale Manager",
+  "sender_company": "Sree Plywood Distributors Pvt Ltd",
+  "sender_description": "Wholesale manager at Sree Plywood Distributors Pvt Ltd, connecting Indian buyers with reliable plywood suppliers in Vietnam.",
+  "qualifier_context": "We're Rahal from Sree Plywood Distributors Pvt Ltd. We help Indian buyers source high-quality plywood and wood products from reliable Vietnamese manufacturers. Our focus is on long-term partnerships, scalable sourcing, and predictable volume. We actively filter out opportunistic or price-only sellers, inconsistent producers, and those with poor communication. Our goal is to provide a consistent supply of commercial-grade plywood, film-faced plywood, and furniture-grade plywood to Indian buyers.",
+  "ideal_customer_profile": "Vietnam-based plywood manufacturers and export-focused trading companies with experience supplying international markets, especially India, the Middle East, or Southeast Asia.",
+  "what_we_offer": "We offer a stable, long-term procurement model for high-quality plywood and wood products. Our focus is on volume-driven sourcing, predictable volume, and consistent quality. We help Vietnamese manufacturers expand their exports to Indian buyers and establish a strong presence in the Indian market.",
+  "strong_signals": [
+    "Active export expansion",
+    "Scalable production capacity",
+    "Competitive cost structures",
+    "Product-market fit for India",
+    "Existing export experience",
+    "Long-term partnership mindset"
+  ],
+  "weak_signals": [
+    "Pure trading companies with no control over production",
+    "Opportunistic / price-only sellers",
+    "Inconsistent production or small-scale units",
+    "No export experience",
+    "Poor communication / slow responsiveness",
+    "Lack of quality standardization",
+    "Over-customization dependency"
+  ],
+  "search_queries": [
+    {
+      "signal": "export_expansion",
+      "queries": [
+        "vietnam plywood export India",
+        "india plywood supplier vietnam"
+      ]
+    },
+    {
+      "signal": "production_capacity",
+      "queries": [
+        "vietnam plywood factory capacity",
+        "pulpwood export vietnam"
+      ]
+    },
+    {
+      "signal": "cost_structure",
+      "queries": [
+        "vietnam plywood wholesale price",
+        "export cost structures timber vietnam"
+      ]
+    },
+    {
+      "signal": "product_market_fit",
+      "queries": [
+        "commercial plywood supply vietnam",
+        "wood panel manufacturer vietnam"
+      ]
+    },
+    {
+      "signal": "export_experience",
+      "queries": [
+        "india business partner vietnam",
+        "pulpwood export company vietnam"
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news",
+    "google",
+    "reddit",
+    "instagram",
+    "facebook"
+  ],
+  "search_geo": "us",
+  "max_results_per_query": 15,
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "Vietnam-based plywood manufacturers",
+      "Export-focused trading companies"
+    ],
+    "geographies": [
+      "Vietnam"
+    ],
+    "signal_types": [
+      "export_expansion",
+      "production_capacity",
+      "cost_structure",
+      "product_market_fit",
+      "export_experience",
+      "long_term_partnership"
+    ]
+  },
+  "batch_size": 0
+}

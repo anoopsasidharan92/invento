@@ -1,0 +1,88 @@
+{
+  "agent_name": "Pollen Direct BD Agent",
+  "sender_name": "John Doe",
+  "sender_company": "Pollen Direct",
+  "sender_description": "B2B marketplace connecting buyers with surplus brands",
+  "qualifier_context": "Pollen Direct helps businesses buy branded inventory at discounted prices, reducing sourcing risk and streamlining the process. We connect qualified buyers with authentic products from verified brand sellers.",
+  "ideal_customer_profile": "Small to mid-sized B2B companies buying in bulk, especially wholesalers, distributors, retailers, and resellers",
+  "what_we_offer": "Access to high-quality branded inventory at deep discounts through a trusted and streamlined buying process",
+  "strong_signals": [
+    "Bulk-buying intent with specific product categories (e.g. beauty, electronics)",
+    "Resale/distribution relevance with plans for wholesale or retail sales",
+    "Surplus inventory pressure due to overstock, packaging changes, or market exit",
+    "Commercial urgency from seasonality, expansion, promotional periods, or portfolio rationalization"
+  ],
+  "weak_signals": [
+    "Generic interest in products without bulk-buying intent",
+    "Vague corporate updates without sourcing problems or commercial urgency"
+  ],
+  "result_schema": {
+    "lead_name_field": "company_name",
+    "categories": [
+      "Bulk buying intent",
+      "Resale/distribution relevance",
+      "Surplus inventory pressure",
+      "Commercial urgency"
+    ],
+    "geographies": [],
+    "signal_types": [
+      "buying_intent",
+      "distribution_relevance",
+      "inventory_pressure",
+      "commercial_urgency"
+    ]
+  },
+  "score_thresholds": {
+    "hot_min": 8,
+    "warm_min": 5,
+    "save_min": 4
+  },
+  "search_queries": [
+    {
+      "signal": "buying_intent",
+      "queries": [
+        "bulk buying beauty products online",
+        "wholesale electronics distributors in california",
+        "retailers seeking wholesale deals for outdoor gear"
+      ]
+    },
+    {
+      "signal": "distribution_relevance",
+      "queries": [
+        "skincare product wholesalers with multiple locations",
+        "electronics importers with fulfillment centers in texas",
+        "fashion brands looking for wholesale partners in new york"
+      ]
+    },
+    {
+      "signal": "inventory_pressure",
+      "queries": [
+        "overstocked electronics inventory clearance",
+        "beauty product distributors seeking to offload excess stock",
+        "wholesale electronics retailers with surplus inventory due to market exit"
+      ]
+    },
+    {
+      "signal": "commercial_urgency",
+      "queries": [
+        "seasonal bulk buying for christmas season in us retail",
+        "wholesale plans for new smartwatch launch in q1 2024",
+        "retailers seeking wholesale deals on outdoor gear for summer season"
+      ]
+    },
+    {
+      "signal": "buying_intent",
+      "queries": [
+        "bulk purchasing cosmetics for e-commerce businesses",
+        "wholesale electronics importers with experience in international trade"
+      ]
+    }
+  ],
+  "search_channels": [
+    "linkedin",
+    "news"
+  ],
+  "max_results_per_query": 5,
+  "search_geo": "us",
+  "batch_size": 50
+}

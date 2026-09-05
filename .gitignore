@@ -20,11 +20,17 @@ outputs/
 backend/.venv/
 backend/context_memory.json
 
-# Pollen BD Agent — user-specific files, never committed
+# Agent secrets and top-level user state — never committed
 pollen-bd-agent/config.json
 pollen-bd-agent/data/
 pollen-bd-agent/.env
 real-estate-agent/.env
 sales-deal-agent/.env
+
+# Agent run output (leads, listings, search history, status, lineage).
+# Regenerated on every run — per-project config.json stays tracked.
+pollen-bd-agent/projects/*/data/
+real-estate-agent/projects/*/data/
+sales-deal-agent/projects/*/data/
 
 *.log
